@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "teamcomms-ai"
+version = "0.1.0.dev0"
+description = "Distributed collaboration for humans, AI sessions, and systems"
+readme = "README.md"
+requires-python = ">=3.11"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+authors = [{name = "Torre Wenaus"}]
+dependencies = []
+
+[project.urls]
+Repository = "https://github.com/wenaus/teamcomms-ai"
+Design = "https://github.com/wenaus/teamcomms-ai/blob/main/docs/design.md"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["teamcomms*"]
+namespaces = false
