@@ -95,6 +95,8 @@ def create_app():
         return handler
 
     mcp_app = mcp.streamable_http_app()
+    from teamcomms.entries.api import register as register_entries
+    entry_routes = register_entries(mcp, endpoint)
 
     @asynccontextmanager
     async def lifespan(app):
@@ -110,6 +112,7 @@ def create_app():
         }), methods=["GET", "POST"]),
         Route("/api/credentials", endpoint({"POST": (operations.issue_credential, NewCredential)}), methods=["POST"]),
         Route("/api/credentials/revoke", endpoint({"POST": (operations.revoke_credential, CredentialReference)}), methods=["POST"]),
+        *entry_routes,
         Mount("/mcp", mcp_app),
     ], lifespan=lifespan)
 

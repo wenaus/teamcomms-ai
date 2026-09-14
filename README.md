@@ -5,8 +5,9 @@ A distributed collaboration system for humans, AI sessions, programmatic systems
 The [design document](docs/design.md) describes the components, distributed architecture, and implementation sequence, including initial Claude Code and Codex support.
 
 The central service provides PostgreSQL migrations, team and participant
-identity, scoped credentials, and authenticated HTTP and MCP directory
-operations. The other component packages are scaffolds.
+identity, scoped credentials, and authenticated HTTP and MCP operations.
+[Entries](docs/entries.md) provides notes and documents with revision history,
+relationships, and search. The remaining component packages are scaffolds.
 
 ## Repository structure
 

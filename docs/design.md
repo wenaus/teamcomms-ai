@@ -149,6 +149,12 @@ Delivery is recorded independently of acknowledgment. Missing transcript coverag
 
 A bounded `get_dialog` interface filters by team, host, participant, session, topic, and time window. Handoffs combine relevant history with the current task and document revisions. Assessment and other consumers access the same authorized record; their analysis policies belong to the consuming application.
 
+### Session bootstrap
+
+Dialog supplies session-start context. At registration, a Claude Code or Codex connector can request recent dialog for its host, participant, or topic, so a new session begins with the team's recent history. This opt-in capability also supports explicit context reloads during a session.
+
+Startup configuration selects the history window and context budget, with continuation links for further reading. Returned context preserves authorship, timestamps, source references, and coverage gaps. Installations can supplement history with applicable guidance entries and references to current work and the Pouch; historical conversation retains its role as context.
+
 ## Messages and delivery
 
 Messages distinguish notifications, conversation, and explicit work offers. Each carries a stable identifier, schema version, author, source, creation and observation times, content, audience, conversation and reply references, and optional topic, task, resource, incident, or document-version references. State notices identify the revision they describe and can reference a superseded notice. Attachments and evidence links provide detail beyond the compact envelope.
@@ -291,6 +297,7 @@ The implementation proceeds through integrated stages:
 | Documents and Pouch | One canonical Pouch; preserved versions and review references; human and AI edits reject stale or ambiguous changes |
 | Editing | Reliable save state and recovery, preserved structure and active buffers, scoped bulk selection, and exact conflict and partial-result reporting |
 | Dialog | Human turns, during-turn updates, final responses, and peer provenance survive replay without duplicate counting |
+| Session bootstrap | Fresh Claude Code and Codex sessions receive configured recent history at registration within a bounded budget, with provenance and incomplete coverage visible; reload retrieves updated context |
 | Delegation | Work within existing scope is accepted; actual restrictions are identified; human authorship remains verifiable |
 | Ownership | Unclaimed, blocked, disconnected, and handing-off tasks retain an owner; stale transfers and results are rejected |
 | Reservations | Concurrent requests produce one valid holder; protected operations reject stale generations; advisory limitations are visible |

@@ -19,7 +19,7 @@ class NewParticipant(RequestModel):
 
 class NewCredential(RequestModel):
     participant_id: UUID
-    scopes: list[str] = Field(min_length=1, max_length=3)
+    scopes: list[str] = Field(min_length=1, max_length=5)
     expires_at: datetime | None = None
 
 

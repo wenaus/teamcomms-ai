@@ -14,6 +14,10 @@ def main():
     provision.add_argument("--team", required=True)
     provision.add_argument("--owner", required=True)
     provision.add_argument("--token-file", required=True, type=Path)
+    credential = commands.add_parser("issue-token", help="Provision a credential using local database access")
+    credential.add_argument("--participant", required=True)
+    credential.add_argument("--scope", action="append", required=True)
+    credential.add_argument("--token-file", required=True, type=Path)
     serve = commands.add_parser("serve", help="Run the HTTP and MCP service")
     serve.add_argument("--host", default="127.0.0.1")
     serve.add_argument("--port", type=int, default=8765)
@@ -32,7 +36,9 @@ def main():
         call_command("migrate", interactive=False)
         return
 
-    if not args.team.strip() or not args.owner.strip() or max(len(args.team), len(args.owner)) > 120:
+    if args.command == "bootstrap" and (
+        not args.team.strip() or not args.owner.strip() or max(len(args.team), len(args.owner)) > 120
+    ):
         parser.error("Team and owner must be nonempty names of at most 120 characters")
     from django.db import transaction
     from .operations import bootstrap
@@ -42,7 +48,18 @@ def main():
         parser.error("Token file already exists; choose a new path")
     try:
         with os.fdopen(fd, "w") as output, transaction.atomic():
-            result, token = bootstrap(args.team.strip(), args.owner.strip())
+            if args.command == "bootstrap":
+                result, token = bootstrap(args.team.strip(), args.owner.strip())
+            else:
+                from .access import MEMBER_SCOPES, SCOPES, mint_credential
+                from .models import Membership
+                member = Membership.objects.get(participant_id=args.participant, active=True)
+                scopes = set(args.scope)
+                allowed = SCOPES if member.role == "admin" else MEMBER_SCOPES
+                if not scopes <= allowed:
+                    raise ValueError("Scopes are not valid for this membership")
+                issued, token = mint_credential(member, scopes)
+                result = {"credential_id": str(issued.id), "participant_id": str(member.participant_id)}
             output.write(token + "\n")
             output.flush()
             os.fsync(output.fileno())

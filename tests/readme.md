@@ -24,3 +24,9 @@ user and never uses the deployment database or credentials.
 `service/test_foundation.py` checks the HTTP/MCP identity and authorization
 contract, shared directory access, credential scopes and revocation, expiry,
 inactive membership, invalid fields, pagination, and transport limits.
+
+`entries/test_entries.py` checks shared entry access, text preservation, bounded
+reads, concurrent and stale updates, revision attribution, pinned references,
+restoration, database immutability, search, and scope enforcement. The temporary
+cluster uses UTF-8 encoding. Standalone verification also provisions a scoped
+credential and creates an entry through MCP for retrieval through HTTP.

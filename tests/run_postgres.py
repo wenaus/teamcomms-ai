@@ -1,6 +1,7 @@
 """Run service tests against a temporary socket-only PostgreSQL cluster."""
 
 import os
+import json
 from pathlib import Path
 import subprocess
 import sys
@@ -26,7 +27,7 @@ def main():
         env["TEAMCOMMS_ALLOWED_HOSTS"] = "localhost,127.0.0.1,testserver"
         env["DJANGO_SETTINGS_MODULE"] = "teamcomms.service.settings"
         env.pop("DJANGO_ALLOW_ASYNC_UNSAFE", None)
-        subprocess.run([str(bindir / "initdb"), "-D", str(data), "--auth=trust", "--no-locale"],
+        subprocess.run([str(bindir / "initdb"), "-D", str(data), "--auth=trust", "--no-locale", "--encoding=UTF8"],
                        env=env, check=True, stdout=subprocess.DEVNULL)
         subprocess.run([str(bindir / "pg_ctl"), "-D", str(data), "-l", str(root / "postgres.log"),
                         "-o", f"-k {socket_dir} -c listen_addresses=''", "-w", "start"], env=env, check=True,
@@ -40,6 +41,10 @@ def main():
                                        env=env, check=True, capture_output=True, text=True)
             assert "tc_" not in bootstrap.stdout
             assert (root / "owner-token").stat().st_mode & 0o777 == 0o600
+            operator = json.loads(bootstrap.stdout)["participant_id"]
+            subprocess.run(cli + ["issue-token", "--participant", operator,
+                "--scope", "entries:read", "--scope", "entries:write",
+                "--token-file", str(root / "entries-token")], env=env, check=True, stdout=subprocess.DEVNULL)
             with socket.socket() as listener:
                 listener.bind(("127.0.0.1", 0))
                 port = listener.getsockname()[1]
@@ -61,7 +66,7 @@ def main():
                             break
                     else:
                         raise RuntimeError("Service startup timed out")
-                    subprocess.run([sys.executable, "tests/check_server.py", url, str(root / "owner-token")],
+                    subprocess.run([sys.executable, "tests/check_server.py", url, str(root / "entries-token")],
                                    env=env, check=True)
                 finally:
                     server.terminate()

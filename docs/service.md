@@ -2,6 +2,7 @@
 
 The service provides a PostgreSQL identity store and authenticated HTTP and MCP
 operations for team membership, participant discovery, and credential management.
+The [Entries interface](entries.md) adds versioned content and search.
 It uses Django 5.2 for ORM operations and migrations, Starlette for the ASGI
 application, and FastMCP from the official MCP Python SDK 1.x. Component storage
 and message delivery follow the [design](design.md).
@@ -25,8 +26,8 @@ mailbox, transcript, and interface code into their respective packages.
 
 ## Setup
 
-Python 3.11 or later and PostgreSQL 14 or later are required. The database and
-role are provisioned by the installation operator. The role applying migrations
+Python 3.11 or later and PostgreSQL 14 or later with UTF-8 encoding are required.
+The database and role are provisioned by the installation operator. The role applying migrations
 needs schema-creation privileges in that database.
 
 From a checkout:
@@ -77,11 +78,25 @@ identity or team through request fields.
 | `directory:read` | List team participants |
 | `directory:write` | Create members; also requires admin membership |
 | `credentials:write` | Issue or revoke team credentials; also requires admin membership |
+| `entries:read` | Read entries, revision history, and search results |
+| `entries:write` | Create, update, and restore notes and documents |
 
 Every authenticated member can inspect its own identity. Provisioned participants
-start as members and receive read credentials. The bootstrap administrator can
-issue additional credentials to its own identity. Issuance can only grant scopes
+start as members and can receive directory-read and Entries credentials. The
+bootstrap administrator can issue additional credentials to its own identity. Issuance can only grant scopes
 held by the issuing credential. API operations do not promote membership roles.
+
+An installation operator with direct database access can provision a credential
+with explicit scopes, including scopes introduced by an upgrade:
+
+```sh
+.venv/bin/teamcomms issue-token --participant PARTICIPANT_UUID \
+  --scope entries:read --scope entries:write --token-file ./entries-token
+```
+
+The token file must be new and is written with mode 0600. The command verifies
+active membership and limits scopes to those permitted for its role. Existing
+credentials remain unchanged; revocation uses the authenticated API or MCP tool.
 
 Revocation, expiry, and inactive membership reject subsequent authenticated
 requests, including MCP calls. A request already admitted may finish. The
@@ -120,8 +135,8 @@ authenticated requests. No cookie or loopback authentication bypass is present.
 ## Host integration
 
 An existing Django application includes `teamcomms.service.apps.ServiceConfig`
-in `INSTALLED_APPS` and applies its migrations to the team's authoritative
-database. Host settings supply the PostgreSQL connection and explicit
+and `teamcomms.entries.apps.EntriesConfig` in `INSTALLED_APPS` and applies their
+migrations to the team's authoritative database. Host settings supply the PostgreSQL connection and explicit
 `ALLOWED_HOSTS`. `teamcomms.service.asgi.create_app()` respects an already
 initialized Django application and returns the HTTP/MCP ASGI application.
 

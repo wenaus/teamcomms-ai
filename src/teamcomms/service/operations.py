@@ -3,7 +3,7 @@
 from django.db import transaction
 from django.utils import timezone
 
-from .access import AccessError, SCOPES, mint_credential
+from .access import AccessError, MEMBER_SCOPES, SCOPES, mint_credential
 from .models import Credential, Membership, Participant, Team
 
 
@@ -57,8 +57,8 @@ def issue_credential(actor, request):
                                        participant_id=request.participant_id, active=True).first()
     if member is None:
         raise AccessError("Member not found", 404)
-    if member.role != "admin" and scopes - {"directory:read"}:
-        raise AccessError("Member credentials may only read the directory", 400)
+    if member.role != "admin" and scopes - MEMBER_SCOPES:
+        raise AccessError("Requested scopes require admin membership", 400)
     credential, token = mint_credential(member, scopes, request.expires_at)
     return {"credential_id": str(credential.id), "token": token,
             "participant_id": str(member.participant_id), "scopes": sorted(scopes)}

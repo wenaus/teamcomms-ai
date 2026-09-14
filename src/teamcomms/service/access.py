@@ -10,7 +10,8 @@ from django.utils import timezone
 
 from .models import Credential
 
-SCOPES = frozenset({"directory:read", "directory:write", "credentials:write"})
+SCOPES = frozenset({"directory:read", "directory:write", "credentials:write", "entries:read", "entries:write"})
+MEMBER_SCOPES = frozenset({"directory:read", "entries:read", "entries:write"})
 
 
 class AccessError(Exception):
