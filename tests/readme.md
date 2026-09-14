@@ -52,6 +52,16 @@ and revocation while a stream is open.
 
 ## Connectors
 
+`tests/check_connector_shutdown.py` exercises only disconnected-wrapper shutdown:
+idle and approval/input waits, bounded active work and unavailable RPCs, supervisor
+cancellation, and TERM-resistant process groups with helpers. It uses synthetic
+local processes and status fixtures, without native clients, database access,
+model calls, or deployed services.
+
+```sh
+.venv/bin/python tests/check_connector_shutdown.py
+```
+
 `connectors/` checks crash recovery, lost receipt responses, replay deduplication,
 explicit retries, startup registry timing, enrollment recovery, and native
 Claude/Codex protocol frames. The database integration check enrolls two synthetic

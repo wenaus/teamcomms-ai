@@ -18,6 +18,55 @@ from .startup import spawn
 
 logger = logging.getLogger(__name__)
 
+DISCONNECT_GRACE = 30
+STOP_GRACE = 5
+POLL_INTERVAL = 2
+
+
+async def stop_process_groups(group_ids, children=()):
+    """Stop only process groups created with start_new_session by this wrapper."""
+    remaining = set(group_ids)
+    if any(pid <= 1 or pid == os.getpgrp() for pid in remaining):
+        raise ValueError("Refusing to stop an unowned process group")
+    for pid in list(remaining):
+        try:
+            os.killpg(pid, signal.SIGTERM)
+        except ProcessLookupError:
+            remaining.remove(pid)
+    deadline = time.monotonic() + STOP_GRACE
+    while remaining and time.monotonic() < deadline:
+        for child in children:
+            child.poll()  # Reap receiver children before probing their groups.
+        for pid in list(remaining):
+            try:
+                os.killpg(pid, 0)
+            except ProcessLookupError:
+                remaining.remove(pid)
+        if remaining:
+            await asyncio.sleep(.1)
+    for pid in remaining:
+        logger.warning("Process group %s did not stop after SIGTERM; sending SIGKILL", pid)
+        try:
+            os.killpg(pid, signal.SIGKILL)
+        except ProcessLookupError:
+            continue
+    for child in children:
+        try:
+            await asyncio.to_thread(child.wait, timeout=1)
+        except subprocess.TimeoutExpired:
+            logger.error("Owned process %s did not exit after SIGKILL", child.pid)
+
+
+def disconnected(directory, runtime):
+    if (directory / "disconnected").exists():
+        return True
+    try:
+        os.kill(runtime["launcher_pid"], 0)
+    except ProcessLookupError:
+        return True
+    return False
+
+
 VALUE_OPTIONS = {"-c", "--config", "-C", "--cd", "-m", "--model", "-p", "--profile",
                  "-s", "--sandbox", "-a", "--ask-for-approval", "--enable", "--disable",
                  "--add-dir", "--image", "-i", "--local-provider", "--remote-auth-token-env"}
@@ -63,43 +112,85 @@ async def supervise(directory, config, config_path):
     runtime = json.loads((directory / "runtime.json").read_text())
     watched = {}
     restarts = {}
-    while True:
-        try:
-            os.kill(runtime["server_pid"], 0)
-            async with CodexClient(str(directory / "codex.sock")) as client:
-                loaded = await client.loaded_threads()
-                active = False
-                for native_id in loaded:
-                    thread = (await client.call("thread/read", {"threadId": native_id, "includeTurns": False}))["thread"]
-                    if thread.get("threadSource") != "user":
-                        continue
-                    active |= thread["status"]["type"] == "active"
-                    child = watched.get(native_id)
-                    if child is None or child.poll() is not None:
-                        attempts, due = restarts.get(native_id, (0, 0))
-                        if time.monotonic() < due:
-                            continue
-                        watched[native_id] = spawn(config, config_path, client="codex", native_id=native_id,
-                            owner_pid=runtime["server_pid"], socket_path=str(directory / "codex.sock"),
-                            name=thread.get("name") or f"{config.host}-codex-{native_id[-8:]}",
-                            cwd=thread.get("cwd") or runtime["cwd"], model=thread.get("model") or "")
-                        restarts[native_id] = (attempts + 1, time.monotonic() + min(2 ** min(attempts + 1, 8), 300))
-                for native_id in set(watched) - set(loaded):
-                    watched.pop(native_id)
-                    restarts.pop(native_id, None)
-            disconnected = (directory / "disconnected").exists()
-            try:
-                os.kill(runtime["launcher_pid"], 0)
-            except ProcessLookupError:
-                disconnected = True
-            if disconnected and not active:
-                os.killpg(runtime["server_pid"], signal.SIGTERM)
+    disconnected_at = None
+    loop = asyncio.get_running_loop()
+    task = asyncio.current_task()
+    for signum in (signal.SIGTERM, signal.SIGINT):
+        loop.add_signal_handler(signum, task.cancel)
+    try:
+        while True:
+            if disconnected_at is None and disconnected(directory, runtime):
+                disconnected_at = time.monotonic()
+                # Stop delivery as soon as the owning TUI disappears. Keep
+                # native work alive only for its bounded completion grace.
+                await stop_process_groups([p.pid for p in watched.values()], watched.values())
+                watched.clear()
+            remaining = (DISCONNECT_GRACE - (time.monotonic() - disconnected_at)
+                         if disconnected_at is not None else DISCONNECT_GRACE)
+            if remaining <= 0:
+                logger.warning("Disconnected Codex runtime exceeded its completion grace")
                 return
-        except (FileNotFoundError, ProcessLookupError):
-            return
-        except (OSError, ValueError, RuntimeError, WebSocketException) as error:
-            logger.warning("Codex runtime supervision failed (%s): %s", type(error).__name__, error)
-        await asyncio.sleep(2)
+            try:
+                os.kill(runtime["server_pid"], 0)
+                # Bound the whole snapshot, including pagination and close,
+                # so an unavailable server cannot defeat the shutdown deadline.
+                async with asyncio.timeout(min(15, remaining)):
+                    active = await supervise_snapshot(directory, runtime, config, config_path,
+                                                      watched, restarts, disconnected_at is None)
+                if disconnected_at is not None and not active:
+                    return
+            except (FileNotFoundError, ProcessLookupError):
+                return
+            except (OSError, ValueError, RuntimeError, WebSocketException) as error:
+                logger.warning("Codex runtime supervision failed (%s): %s", type(error).__name__, error)
+            delay = POLL_INTERVAL
+            if disconnected_at is not None:
+                delay = min(delay, max(0, DISCONNECT_GRACE - (time.monotonic() - disconnected_at)))
+            await asyncio.sleep(delay)
+    except asyncio.CancelledError:
+        logger.info("Codex supervisor stopping")
+    finally:
+        # No further signal may cancel cleanup halfway through.
+        for signum in (signal.SIGTERM, signal.SIGINT):
+            loop.add_signal_handler(signum, lambda: None)
+        try:
+            await stop_process_groups([runtime["server_pid"], *[p.pid for p in watched.values()]],
+                                      watched.values())
+        finally:
+            for signum in (signal.SIGTERM, signal.SIGINT):
+                loop.remove_signal_handler(signum)
+
+
+async def supervise_snapshot(directory, runtime, config, config_path, watched, restarts, connected):
+    async with CodexClient(str(directory / "codex.sock")) as client:
+        loaded = await client.loaded_threads()
+        active = False
+        for native_id in loaded:
+            thread = (await client.call("thread/read", {"threadId": native_id, "includeTurns": False}))["thread"]
+            if thread.get("threadSource") != "user":
+                continue
+            status = thread["status"]
+            waiting = {"waitingOnApproval", "waitingOnUserInput"}.intersection(status.get("activeFlags", []))
+            if not connected:
+                logger.info("Disconnected thread %s: status=%s active_flags=%s", native_id,
+                            status["type"], status.get("activeFlags", []))
+            active |= status["type"] == "active" and not waiting
+            child = watched.get(native_id)
+            if connected and (child is None or child.poll() is not None):
+                attempts, due = restarts.get(native_id, (0, 0))
+                if time.monotonic() < due:
+                    continue
+                watched[native_id] = spawn(config, config_path, client="codex", native_id=native_id,
+                    owner_pid=runtime["server_pid"], socket_path=str(directory / "codex.sock"),
+                    name=thread.get("name") or f"{config.host}-codex-{native_id[-8:]}",
+                    cwd=thread.get("cwd") or runtime["cwd"], model=thread.get("model") or "")
+                restarts[native_id] = (attempts + 1, time.monotonic() + min(2 ** min(attempts + 1, 8), 300))
+        for native_id in set(watched) - set(loaded):
+            child = watched[native_id]
+            await stop_process_groups([child.pid], [child])
+            watched.pop(native_id)
+            restarts.pop(native_id, None)
+    return active
 
 
 def claude_settings(arguments, command):
@@ -144,7 +235,7 @@ def launch(client, arguments, config, config_path):
             break
         time.sleep(.1)
     else:
-        os.killpg(server.pid, signal.SIGTERM)
+        asyncio.run(stop_process_groups([server.pid], [server]))
         raise RuntimeError(f"Codex app-server did not open its socket; see {directory}/runtime.log")
     (directory / "runtime.json").write_text(json.dumps({"server_pid": server.pid, "launcher_pid": os.getpid(), "cwd": cwd}))
     with (directory / "supervisor.log").open("w") as log:

@@ -92,7 +92,14 @@ The companion leaves native server requests, including approvals, to the owning
 TUI. Peer messages retain their authorship and existing session permissions.
 Administration commands, headless commands, and already-remote invocations pass
 through to Codex. Closing the TUI marks the wrapper disconnected; its supervisor
-lets an active turn finish before stopping that runtime. Failed receiver restarts
+stops its receivers and allows active work up to 30 seconds to finish. Turns
+waiting for approval or user input do not extend shutdown after the TUI exits.
+The supervisor never answers their pending requests. Status-query failures are
+bounded by the same deadline. Shutdown sends SIGTERM to the wrapper's process
+groups and escalates to SIGKILL after five seconds, including remaining helpers.
+Stopping the supervisor explicitly also cleans up its runtime and receivers.
+Receiver state and runtime logs are retained. Attached receivers for existing
+native sessions keep their separately managed lifecycle. Failed receiver restarts
 back off to five minutes. Runtime logs remain in the printed private temporary
 directory for diagnosis.
 
@@ -222,7 +229,9 @@ potentially incomplete.
 | Codex CLI 0.154.0, Linux | Installed app-server initialization, loaded-thread discovery, and context injection into an idle ephemeral thread; no model invocation |
 | Codex CLI 0.154.0, live Linux sessions, 2026-09-14 | SWF installation with TC 7dd93ef: existing ec2dev and swf-testbed sessions received cross-host messages through `/prod/teamcomms/`; busy delivery used `turn/steer`, idle delivery used `turn/start`, and both received model acknowledgments. Receiver restart retained its session and cursor with no duplicate injection; the native app-server and existing TJAI connection remained running |
 | Claude Code 2.1.270, Linux | Installed version inspected; inherited socket frame exercised against a fixture |
-| Live Claude responses and macOS client acceptance | Pending; macOS setup is paused |
+| Claude Code 2.1.270, macOS 26.5.1, 2026-09-14 | An idle socket message started a model turn and received an exact acknowledged reply. Busy delivery arrived during an active tool call and was considered at its boundary. Receiver restart preserved the session and cursor without replay; native settings and TJAI remained intact |
+| Codex CLI 0.154.0, macOS 26.5.1, 2026-09-14 | Existing mac-3 runtime: acknowledged busy `turn/steer`, verified idle `turn/start`, and receiver recovery with the same session/cursor and no duplicates. A separate temporary wrapped runtime delivered idle input but its reply stopped at an unattended sandbox approval; cleanup exposed the shutdown defect addressed above |
+| Live Claude responses, Linux | Pending |
 
 [Tests](../tests/readme.md#connectors) describes the automated checks. The live
 acceptance run must establish idle and busy receipt on both clients and operating
