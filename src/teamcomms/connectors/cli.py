@@ -31,6 +31,9 @@ ENTRY_CALLS = {"create_entry": ("POST", ""), "get_entry": ("GET", "/read"),
     "read_entry_target": ("POST", "/target"), "edit_entry": ("POST", "/edit"),
     "preview_entry_edits": ("POST", "/edits/preview"), "apply_entry_edits": ("POST", "/edits/apply"),
     "get_entry_edit": ("GET", "/edits/read")}
+INFLIGHT_CALLS = {"create_work": ("POST", ""), "list_work": ("GET", ""),
+    "get_work": ("GET", "/read"), "mutate_work": ("POST", "/mutate"),
+    "get_work_changes": ("GET", "/changes")}
 POUCH_CALLS = {"get_pouch": ("GET", ""), "initialize_pouch": ("POST", "/initialize"),
                "get_pouch_changes": ("GET", "/changes"), "export_pouch": ("GET", "/export")}
 
@@ -82,7 +85,7 @@ async def call(args, config):
     body = json.load(sys.stdin) if args.arguments == "-" else json.loads(args.arguments)
     prefix, methods = next((prefix, methods) for prefix, methods in (
         ("/api/comms", CALLS), ("/api/dialog", DIALOG_CALLS),
-        ("/api/entries", ENTRY_CALLS), ("/api/pouch", POUCH_CALLS)) if args.tool in methods)
+        ("/api/inflight", INFLIGHT_CALLS), ("/api/entries", ENTRY_CALLS), ("/api/pouch", POUCH_CALLS)) if args.tool in methods)
     method, path = methods[args.tool]
     try:
         # Persist outgoing messages before attempting network publication.
@@ -197,7 +200,7 @@ def main():
     recv.add_argument("--cwd", default=os.getcwd())
     recv.add_argument("--once", action="store_true")
     helper = commands.add_parser("call", help="Invoke a Comms, Dialog, Entries or Pouch operation with JSON or stdin (-)")
-    helper.add_argument("tool", choices=sorted(CALLS | DIALOG_CALLS | ENTRY_CALLS | POUCH_CALLS))
+    helper.add_argument("tool", choices=sorted(CALLS | DIALOG_CALLS | ENTRY_CALLS | POUCH_CALLS | INFLIGHT_CALLS))
     helper.add_argument("arguments")
     commands.add_parser("flush", help="Retry the durable outgoing message queue")
     commands.add_parser("status", help="Inspect local session dispatch/recovery state")

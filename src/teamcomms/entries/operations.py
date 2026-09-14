@@ -24,10 +24,23 @@ def _expected(entry, number):
         raise AccessError(f"STALE_REVISION: expected {number}, current {entry.revision}", 409)
 
 
+def reference_entry(actor, entry_id):
+    entry = Entry.objects.filter(team_id=actor.team_id, pk=entry_id).first()
+    if entry is None:
+        raise AccessError("Referenced entry not found", 404)
+    if entry.kind == "inflight":
+        actor.require("inflight:read")
+    elif entry.kind in ("note", "document"):
+        actor.require("entries:read")
+    else:
+        raise AccessError("Unsupported reference component", 400)
+    return entry
+
+
 def _references(actor, state):
     references = []
     for ref in state.relations:
-        target = _entry(actor, ref.entry_id)
+        target = reference_entry(actor, ref.entry_id)
         revision = None
         if ref.revision is not None:
             revision = Revision.objects.filter(entry=target, number=ref.revision).first()

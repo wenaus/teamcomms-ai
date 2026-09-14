@@ -1,1 +1,1 @@
-"""Coordinated tasks, ownership, handoffs, and resource reservations."""
+"""Structured work with persistent ownership and accepted handoffs."""

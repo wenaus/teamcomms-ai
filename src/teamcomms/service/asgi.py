@@ -111,6 +111,10 @@ def create_app(*, host_auth=None, mount_path="", browser_csrf_url=None):
     if apps.is_installed("teamcomms.pouch"):
         from teamcomms.pouch.api import register as register_pouch
         pouch_routes = register_pouch(mcp, endpoint)
+    inflight_routes = []
+    if apps.is_installed("teamcomms.inflight"):
+        from teamcomms.inflight.api import register as register_inflight
+        inflight_routes = register_inflight(mcp, endpoint)
     from teamcomms.comms.api import register as register_comms
     comms_routes = register_comms(mcp, endpoint)
     from teamcomms.dialog.api import register as register_dialog
@@ -136,6 +140,7 @@ def create_app(*, host_auth=None, mount_path="", browser_csrf_url=None):
         ]),
         *entry_routes,
         *pouch_routes,
+        *inflight_routes,
         *comms_routes,
         *dialog_routes,
         *ui_routes,

@@ -80,10 +80,9 @@ def send_message(actor, request):
     if request.reply_to and (not sender or not Delivery.objects.filter(message_id=request.reply_to, session=sender).exists()):
         raise AccessError("Reply must reference a message delivered to the sending session", 400)
     references = []
-    if request.references:
-        actor.require("entries:read")
     for ref in request.references:
-        entry = Entry.objects.filter(pk=ref.entry_id, team_id=actor.team_id).first()
+        from teamcomms.entries.operations import reference_entry
+        entry = reference_entry(actor, ref.entry_id)
         revision = Revision.objects.filter(entry=entry, number=ref.revision).first() if entry and ref.revision else None
         if entry is None or (ref.revision and revision is None):
             raise AccessError("Referenced entry version not found", 404)

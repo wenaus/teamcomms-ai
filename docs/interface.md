@@ -1,7 +1,8 @@
 # Browser interface
 
 The authenticated TeamComms root opens Entries. Shared navigation also exposes
-the canonical [Pouch](pouch.md) and read-only session and Dialog views. All pages,
+the canonical [Pouch](pouch.md), structured [Inflight](inflight.md) work and
+read-only session and Dialog views. All pages,
 assets, reads and writes use the installation's existing authentication boundary
 and URL prefix.
 
@@ -108,3 +109,13 @@ browser exercise against synthetic Entries responses; no production data or
 PostgreSQL cluster is used. It covers rendering, source retention, failed saves,
 concurrent edits, recovery, revision restoration and prefixed assets. Full-suite
 runs require the separate approval specified in AGENTS.md.
+
+## Structured work
+
+[Inflight](inflight.md) at `/inflight` reuses this editor and its local recovery,
+rendering and fixed-revision comparison. Live/Done lists show owner, state and
+blockers; internal work has an explicit visibility filter. Pouch offers **Create
+work from this revision**, which preselects a saved source reference without
+creating anything until Save. Work controls record criteria, progress, executor
+assignment, accepted handoffs, completion evidence and explicit reopening.
+Generic Entries restore cannot alter work ownership or lifecycle.

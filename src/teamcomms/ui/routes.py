@@ -34,6 +34,7 @@ class Preview(BaseModel):
 
 
 class Comparison(Preview):
+    component: str = Field(default="entries", pattern="^(entries|inflight)$")
     entry_id: UUID
     revision: int = Field(ge=1)
 
@@ -49,7 +50,8 @@ def routes(browser_csrf_url=None):
 
     async def page(request):
         try:
-            current_principal.get().require('entries:read')
+            path = request.url.path.removeprefix(request.scope.get('root_path', ''))
+            current_principal.get().require('inflight:read' if path == '/inflight' or path.startswith('/inflight/') else 'entries:read')
         except AccessError as error:
             return JSONResponse({'error': str(error)}, status_code=error.status)
         prefix = request.scope.get('root_path', '').rstrip('/')
@@ -60,7 +62,9 @@ def routes(browser_csrf_url=None):
 
     async def render(request):
         try:
-            current_principal.get().require('entries:read')
+            actor = current_principal.get()
+            if not actor.scopes & {'entries:read', 'inflight:read'}:
+                raise AccessError('Insufficient permission')
             data = Preview.model_validate(await request.json())
             html = await run_in_threadpool(render_body, data.content)
             return JSONResponse({'html': html}, headers=SECURITY_HEADERS)
@@ -72,7 +76,11 @@ def routes(browser_csrf_url=None):
     async def compare(request):
         try:
             data = Comparison.model_validate(await request.json())
-            saved = await invoke(read_entry, ReadEntry(entry_id=data.entry_id,
+            operation = read_entry
+            if data.component == 'inflight':
+                from teamcomms.inflight.operations import get_work
+                operation = get_work
+            saved = await invoke(operation, ReadEntry(entry_id=data.entry_id,
                 revision=data.revision, max_content_length=40000))
             def difference():
                 return ''.join(difflib.unified_diff(
@@ -86,7 +94,7 @@ def routes(browser_csrf_url=None):
             return JSONResponse({'error': str(error)}, status_code=error.status)
 
     return [Route('/', page), Route('/entries', page), Route('/entries/{entry_id:uuid}', page), Route('/pouch', page),
-            Route('/sessions', page), Route('/dialog', page),
+            Route('/inflight', page), Route('/inflight/{entry_id:uuid}', page), Route('/sessions', page), Route('/dialog', page),
             Route('/api/entries/render', render, methods=['POST']),
             Route('/api/entries/compare', compare, methods=['POST']),
             Mount('/assets', StaticFiles(directory=ROOT / 'assets'))]

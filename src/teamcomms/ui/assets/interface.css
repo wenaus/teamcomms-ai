@@ -6,3 +6,11 @@
 .CodeMirror.cm-s-material-darker .cm-comment{color:var(--muted)}
 .CodeMirror.cm-s-material-darker .CodeMirror-linenumber{color:var(--muted)}
 nav a[aria-current=page]{font-weight:700;text-decoration-thickness:2px}
+
+/* Inflight uses the existing document/editor layout. */
+.work-controls{margin:1rem 0;padding:1rem;border:1px solid var(--border);border-radius:.5rem}
+.work-controls label{display:block;margin:.5rem 0}
+.work-controls textarea{display:block;width:100%;font:inherit}
+#work-summary{font-weight:600;margin-bottom:.75rem}
+#work-outcome{white-space:pre-wrap;margin:.75rem 0}
+#work-links a{display:inline-block;margin:.3rem .6rem .3rem 0}
