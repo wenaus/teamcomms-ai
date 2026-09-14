@@ -105,6 +105,18 @@ class Reference(Request):
     revision: int | None = Field(default=None, ge=1)
 
 
+class ExternalSource(Request):
+    platform: Literal["mattermost"] = "mattermost"
+    authority: Literal["connector-reported"] = "connector-reported"
+    server: str = Field(min_length=1, max_length=2048)
+    channel_id: Label
+    post_id: Label
+    thread_id: str = Field(default="", max_length=160)
+    user_id: Label
+    username: Label
+    kind: Literal["human", "bot", "service"]
+
+
 class SendMessage(Request):
     message_id: UUID
     sender_session_id: UUID | None = None
@@ -116,6 +128,7 @@ class SendMessage(Request):
     reply_requested: bool = False
     observed_at: datetime | None = None
     references: list[Reference] = Field(default_factory=list, max_length=30)
+    external_source: ExternalSource | None = None
 
     @model_validator(mode="after")
     def aware(self):

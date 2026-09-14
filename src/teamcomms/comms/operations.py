@@ -67,6 +67,9 @@ def _targets(actor, request):
 def send_message(actor, request):
     actor.require("comms:write")
     envelope = request.model_dump(mode="json", exclude={"message_id"})
+    if request.external_source is None:
+        # Preserve exact retry equality with envelopes stored before this field.
+        envelope.pop("external_source")
     lock(f"tc-message:{request.message_id}")
     existing = Message.objects.filter(pk=request.message_id).first()
     if existing:

@@ -1,0 +1,14 @@
+{
+  "url": "https://chat.example.org",
+  "token_file": "mattermost-token",
+  "routes": [
+    {
+      "channel_id": "abcdefghijklmnopqrstuvwxyz",
+      "name": "Operations live feed",
+      "topics": ["operations-events"],
+      "inbound_audience": {"topics": ["operations-events"]}
+    }
+  ],
+  "poll_seconds": 2,
+  "max_pages": 20
+}

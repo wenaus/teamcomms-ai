@@ -5,7 +5,8 @@
 service URL and participant credential file as described in
 [Connectors setup](../docs/connectors.md). It contains no credentials.
 
-Runnable examples belong here with their configuration, commands, and expected
-results. Planned examples cover participant messaging, a watcher notification,
-and Mattermost routing. Each example uses synthetic data and explicitly
-configured destinations.
+[`mattermost.json`](mattermost.json) configures channel routes, and
+[`watcher-event.json`](watcher-event.json) supplies a synthetic notification.
+Copy and edit these for the intended installation; configure explicit subscriptions
+before publishing. [Mattermost and watcher setup](../docs/mattermost.md) describes
+commands, credentials, threading, and recovery. These examples contain no secrets.

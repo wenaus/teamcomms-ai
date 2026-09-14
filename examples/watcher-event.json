@@ -1,0 +1,8 @@
+{
+  "source": "example-monitor",
+  "event_id": "workflow-completion:123",
+  "content": "Observed workflow completion: example-run-123. Source event workflow-completion:123.",
+  "observed_at": "2026-09-14T08:00:00Z",
+  "topic": "operations-events",
+  "audience": {"topics": ["operations-events"]}
+}

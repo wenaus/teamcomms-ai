@@ -191,6 +191,10 @@ def main():
     helper.add_argument("arguments")
     commands.add_parser("flush", help="Retry the durable outgoing message queue")
     commands.add_parser("status", help="Inspect local session dispatch/recovery state")
+    mattermost = commands.add_parser("mattermost", help="Run explicit Mattermost channel routes")
+    mattermost.add_argument("--routes", required=True, help="Mattermost endpoint/token/routes JSON")
+    watcher = commands.add_parser("publish-event", help="Publish one stable watcher event from JSON or stdin (-)")
+    watcher.add_argument("event", help="JSON file path or - for stdin")
     record = commands.add_parser("record", help="Record a selected native transcript with a durable cursor")
     record.add_argument("--session-id", required=True)
     record.add_argument("--native-id", required=True)
@@ -223,6 +227,21 @@ def main():
             asyncio.run(record_dialog(args, config))
         elif args.command == "reload":
             asyncio.run(reload_context(args, config))
+        elif args.command == "mattermost":
+            from .mattermost import MattermostConfig, run
+            asyncio.run(run(config, load(args.routes, MattermostConfig), str(Path(args.config).resolve())))
+        elif args.command == "publish-event":
+            from .watcher import publish_event
+            event = json.load(sys.stdin) if args.event == "-" else json.loads(Path(args.event).read_text())
+            async def publish():
+                service = ServiceClient(config)
+                store = Store(private_directory(config.state_dir) / "outgoing")
+                try:
+                    return await publish_event(service, store, **event)
+                finally:
+                    store.close()
+                    await service.close()
+            print(json.dumps(asyncio.run(publish())))
         elif args.command == "status":
             directories = set(config.state_dir.glob("*")) | set(config.state_dir.glob("*/dialog"))
             for directory in sorted(directories):
@@ -231,6 +250,8 @@ def main():
                     try:
                         print(json.dumps({"directory": str(directory), "session_id": store.get("session_id"),
                             "setup_state": store.get("setup_state"), "capture_error": store.get("capture_error", ""),
+                            "mattermost_coverage": store.get("mm:coverage"),
+                            "mattermost_inbound_error": store.get("mm:inbound_error"),
                             "cursor": store.get("cursor", 0), "pending": [{"delivery_id": d["id"], "phase": d["phase"],
                             "error": d["error"]} for d in store.pending()], "outgoing": len(store.outgoing())}))
                     finally:

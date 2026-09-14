@@ -14,6 +14,11 @@ def message_text(message):
     label = " · ".join(" ".join(str(v).split()) for v in
         (author.get("session_name") or author["name"], author.get("host"), author["kind"]) if v)
     reply = "reply requested" if message["reply_requested"] else "no reply needed"
+    source = message.get("external_source")
+    if source:
+        provenance = " · ".join(" ".join(str(source[k]).split()) for k in
+                                 ("platform", "username", "kind", "channel_id", "post_id"))
+        label += f"\nExternal source (connector-reported): {provenance}"
     return f"{label} · {reply}\n\n{message['content']}"
 
 

@@ -11,6 +11,8 @@ relationships, and search. [Comms](docs/comms.md) provides the session directory
 routing, durable messages, delivery receipts, and HTTP streaming/replay.
 [Connectors](docs/connectors.md) packages Claude Code and Codex enrollment,
 native delivery, and local recovery, with explicit host configuration.
+[Mattermost and watchers](docs/mattermost.md) provide explicit channel routes,
+external provenance, thread preservation, and durable event publication.
 [Dialog](docs/dialog.md) provides attributed transcript capture, bounded history,
 and opt-in session bootstrap. Pouch, Inflight, and Capcom remain scaffolds.
 

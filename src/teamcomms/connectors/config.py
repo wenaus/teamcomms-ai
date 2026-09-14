@@ -45,11 +45,11 @@ class Configuration(BaseModel):
         return token
 
 
-def load(path):
+def load(path, model=Configuration):
     path = Path(path).expanduser().resolve()
     data = json.loads(path.read_text())
     for field in ("token_file", "state_dir"):
         if field in data:
             value = Path(data[field]).expanduser()
             data[field] = value if value.is_absolute() else path.parent / value
-    return Configuration.model_validate(data)
+    return model.model_validate(data)

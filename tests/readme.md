@@ -52,6 +52,17 @@ and revocation while a stream is open.
 
 ## Connectors
 
+`tests/check_mattermost.py` checks only platform routing and watcher recovery
+using synthetic service adapters and private SQLite state. It covers reply
+threads, external provenance, reflection suppression, frozen inbound retries,
+coverage gaps, definite rejection retries, and positive reconciliation after a
+lost post response. No native clients, model calls, PostgreSQL, or deployed
+services are used.
+
+```sh
+.venv/bin/python tests/check_mattermost.py
+```
+
 `tests/check_connector_shutdown.py` exercises only disconnected-wrapper shutdown:
 idle and approval/input waits, bounded active work and unavailable RPCs, supervisor
 cancellation, and TERM-resistant process groups with helpers. It uses synthetic

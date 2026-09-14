@@ -51,8 +51,12 @@ class Store:
         return json.loads(row[0]) if row else default
 
     def put(self, key, value):
+        self.put_many({key: value})
+
+    def put_many(self, values):
         with self.db:
-            self.db.execute("INSERT OR REPLACE INTO metadata VALUES (?, ?)", (key, json.dumps(value)))
+            self.db.executemany("INSERT OR REPLACE INTO metadata VALUES (?, ?)",
+                                [(key, json.dumps(value)) for key, value in values.items()])
 
     def ingest(self, delivery, *, advance=True):
         with self.db:

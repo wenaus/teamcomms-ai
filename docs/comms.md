@@ -76,8 +76,11 @@ The envelope includes kind (`notification`, `conversation`, or `offer`), content
 topic, optional timezone-aware observation time, reply reference, reply-requested
 flag, and entry/version references. The service adds schema version, author
 identity, and creation time. An `offer` records communication; Inflight supplies
-its execution lifecycle. External-platform authorship is supplied by the future
-platform connector contract; callers cannot substitute a message author.
+its execution lifecycle. Optional `external_source` records Mattermost
+server/channel/post/thread and external user identity with authority
+`connector-reported`. It preserves provenance alongside the authenticated
+transport author, which callers cannot replace. This metadata never grants TC
+identity or operator authorization. See [Mattermost](mattermost.md).
 
 A reply must name a message delivered to its sending session. Publishing that
 reply also acknowledges the original delivery to that session. Other destinations
