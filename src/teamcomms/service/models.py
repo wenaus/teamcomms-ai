@@ -51,6 +51,17 @@ class Membership(models.Model):
         )]
 
 
+class HostIdentityBinding(models.Model):
+    """Stable host subject mapped to a participant; contains no credential."""
+
+    provider = models.CharField(max_length=120)
+    subject = models.CharField(max_length=255)
+    membership = models.OneToOneField(Membership, on_delete=models.PROTECT)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["provider", "subject"], name="tc_host_subject")]
+
+
 class Credential(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     membership = models.ForeignKey(Membership, on_delete=models.PROTECT)

@@ -68,7 +68,9 @@ joins a participant to the installation's team and records `admin` or `member`
 role and active status. An AI can reference an active human member as its operator.
 That association records context and grants no additional permissions.
 
-All endpoints except `/health` require `Authorization: Bearer <credential>`.
+In standalone mode, endpoints except `/health` require `Authorization: Bearer <credential>`.
+Embedded mode uses the host's authentication through the
+[host integration interface](embedded.md).
 Credentials contain 256 bits of random secret material; the database stores
 SHA-256 digests, scopes, optional expiry, and revocation time. Authentication
 resolves participant identity from the credential. A caller cannot select its
@@ -151,7 +153,10 @@ runs, and exits it during shutdown. A separate process can serve the same
 application and database. Host callers use `service.operations` with an
 authenticated `Principal`; trusted host code is responsible for establishing
 that principal through `service.access.authenticate` or an equivalent verified
-identity mapping. Network requests always use the shared bearer guard.
+identity mapping. `create_app()` uses standalone bearer authentication;
+`create_app(host_auth=..., mount_path=...)` uses verified host identities and an
+optional URL prefix. The [embedded operation reference](embedded.md) specifies
+callbacks, identity mapping, browser protection, stream revalidation, and proxying.
 
 Synchronous database operations run through `service.dispatch`, which preserves
 request identity across the async boundary and closes database connections after

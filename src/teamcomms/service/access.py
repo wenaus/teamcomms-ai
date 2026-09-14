@@ -25,7 +25,7 @@ class Principal:
     participant_id: UUID
     team_id: UUID
     membership_id: UUID
-    credential_id: UUID
+    credential_id: UUID | None
     role: str
     scopes: frozenset[str]
 
@@ -35,6 +35,7 @@ class Principal:
 
 
 current_principal: ContextVar[Principal] = ContextVar("teamcomms_principal")
+current_authentication: ContextVar = ContextVar("teamcomms_authentication")
 
 
 def mint_credential(membership, scopes, expires_at=None):

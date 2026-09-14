@@ -123,7 +123,8 @@ cannot read the message or receipt history.
 ## Streaming and recovery
 
 A receiver opens an outbound HTTPS `GET /api/comms/stream` with its participant's
-bearer credential and `session_id`. The reverse proxy must forward streaming
+bearer credential and `session_id`. In [embedded mode](embedded.md), the host
+validates its existing token and revalidates access during the stream. The reverse proxy must forward streaming
 responses without buffering. The service also sends `X-Accel-Buffering: no`.
 The standalone loopback development server uses HTTP as described in
 [service setup](service.md).

@@ -1,5 +1,11 @@
 # Tests
 
+Agent execution of the full suite or `tests/run_postgres.py` requires Torre's
+explicit approval for that run. Implementation, commit, and deployment approval
+do not imply test-suite approval. A test selector passed to the runner still
+executes its startup and streaming checks. Follow [AGENTS.md](../AGENTS.md);
+the commands below document usage and do not authorize execution.
+
 Component tests belong under directories matching the packages in
 `src/teamcomms/`. Integration tests cover shared persistence, concurrent
 operations, and connector delivery. Tests use isolated data and explicit
@@ -24,6 +30,12 @@ user and never uses the deployment database or credentials.
 `service/test_foundation.py` checks the HTTP/MCP identity and authorization
 contract, shared directory access, credential scopes and revocation, expiry,
 inactive membership, invalid fields, pagination, and transport limits.
+
+`service/test_embedded.py` verifies host session/token access, CSRF enforcement,
+stable identity mapping, AI/operator attribution, permission changes, credential
+isolation, concurrent enrollment, and mounted HTTP/MCP paths. The streaming test
+starts an upstream ASGI server and a local HTTP proxy, then verifies immediate
+delivery, reconnect/replay, and host access revalidation on the open connection.
 
 `entries/test_entries.py` checks shared entry access, text preservation, bounded
 reads, concurrent and stale updates, revision attribution, pinned references,

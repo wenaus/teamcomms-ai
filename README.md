@@ -13,6 +13,9 @@ routing, durable messages, delivery receipts, and HTTP streaming/replay.
 native delivery, and local recovery, with explicit host configuration.
 The remaining component packages are scaffolds.
 
+[Embedded operation](docs/embedded.md) integrates TC with a host application's
+existing accounts, tokens, database, URL namespace, and deployment.
+
 ## Repository structure
 
 | Path | Responsibility |
@@ -53,6 +56,9 @@ startup, and the API. Package builds use setuptools:
 
 With PostgreSQL server tools installed, the [service checks](tests/readme.md)
 run against a temporary database cluster:
+
+Agents must obtain explicit approval before running this suite; see
+[AGENTS.md](AGENTS.md).
 
 ```sh
 .venv/bin/python tests/run_postgres.py -q

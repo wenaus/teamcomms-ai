@@ -14,7 +14,7 @@ from starlette.responses import JSONResponse
 from starlette.routing import Mount, Route
 
 
-def create_app():
+def create_app(*, host_auth=None, mount_path=""):
     """Return an ASGI app; an initialized host Django project supplies its settings."""
     if not apps.ready:
         os.environ.setdefault("DJANGO_SETTINGS_MODULE", "teamcomms.service.settings")
@@ -23,10 +23,19 @@ def create_app():
     from mcp.server.fastmcp import FastMCP
     from mcp.server.transport_security import TransportSecuritySettings
     from . import operations
-    from .access import AccessError, authenticate, current_principal
-    from .dispatch import database_call, invoke
+    from .access import AccessError, current_principal, current_authentication
+    from .authentication import standalone_authentication
+    from .embedded import HostAuthentication
+    from .dispatch import invoke
     from .schemas import CredentialReference, DirectoryQuery, NewCredential, NewParticipant
 
+    if host_auth is not None and not isinstance(host_auth, HostAuthentication):
+        raise ValueError("host_auth must be HostAuthentication")
+    if mount_path and (not mount_path.startswith("/") or mount_path.endswith("/")
+                       or any(part in {"", ".", ".."} for part in mount_path[1:].split("/"))
+                       or any(char in mount_path for char in "?#%\\")):
+        raise ValueError("mount_path must be an absolute URL path without a trailing slash")
+    authenticate_request = host_auth.authenticate if host_auth else standalone_authentication
     hosts = settings.ALLOWED_HOSTS
     if not hosts or any("*" in h for h in hosts):
         raise ValueError("TeamComms requires explicit ALLOWED_HOSTS")
@@ -50,20 +59,21 @@ def create_app():
         """Read a bounded page of team participants."""
         return await invoke(operations.list_participants, DirectoryQuery(limit=limit, offset=offset))
 
-    @mcp.tool()
     async def create_participant(request: NewParticipant) -> dict:
         """Create a team member; requires directory:write and admin membership."""
         return await invoke(operations.create_participant, request)
 
-    @mcp.tool()
     async def issue_credential(request: NewCredential) -> dict:
         """Issue a scoped credential; returns its secret once to an authorized admin."""
         return await invoke(operations.issue_credential, request)
 
-    @mcp.tool()
     async def revoke_credential(request: CredentialReference) -> dict:
         """Revoke a credential belonging to this team; requires an authorized admin."""
         return await invoke(operations.revoke_credential, request)
+
+    if host_auth is None:
+        for tool in (create_participant, issue_credential, revoke_credential):
+            mcp.tool()(tool)
 
     def response(value, status=200):
         return JSONResponse(value, status_code=status, headers={"Cache-Control": "no-store"})
@@ -110,10 +120,12 @@ def create_app():
         Route("/api/whoami", endpoint({"GET": (operations.whoami, None)}), methods=["GET"]),
         Route("/api/participants", endpoint({
             "GET": (operations.list_participants, DirectoryQuery),
-            "POST": (operations.create_participant, NewParticipant),
-        }), methods=["GET", "POST"]),
-        Route("/api/credentials", endpoint({"POST": (operations.issue_credential, NewCredential)}), methods=["POST"]),
-        Route("/api/credentials/revoke", endpoint({"POST": (operations.revoke_credential, CredentialReference)}), methods=["POST"]),
+            **({"POST": (operations.create_participant, NewParticipant)} if host_auth is None else {}),
+        }), methods=["GET", "POST"] if host_auth is None else ["GET"]),
+        *([] if host_auth else [
+            Route("/api/credentials", endpoint({"POST": (operations.issue_credential, NewCredential)}), methods=["POST"]),
+            Route("/api/credentials/revoke", endpoint({"POST": (operations.revoke_credential, CredentialReference)}), methods=["POST"]),
+        ]),
         *entry_routes,
         *comms_routes,
         Mount("/mcp", mcp_app),
@@ -121,12 +133,11 @@ def create_app():
 
     class Guard:
         async def __call__(self, scope, receive, send):
-            if scope["type"] != "http" or scope["path"] == scope.get("root_path", "") + "/health":
+            if scope["type"] != "http" or scope["path"].removeprefix(scope.get("root_path", "")) == "/health":
                 return await app(scope, receive, send)
             headers = scope.get("headers", [])
-            auth = [v.decode("latin1") for k, v in headers if k.lower() == b"authorization"]
-            if len(auth) != 1 or not auth[0].startswith("Bearer "):
-                return await response({"error": "Bearer credential required"}, 401)(scope, receive, send)
+            if sum(k.lower() == b"authorization" for k, _ in headers) > 1:
+                return await response({"error": "Ambiguous Authorization header"}, 401)(scope, receive, send)
             origins = [v.decode("latin1") for k, v in headers if k.lower() == b"origin"]
             try:
                 origin = urlsplit(origins[0]) if origins else None
@@ -138,10 +149,6 @@ def create_app():
                 origin_allowed = False
             if not origin_allowed:
                 return await response({"error": "Origin not allowed"}, 403)(scope, receive, send)
-            try:
-                actor = await database_call(authenticate, auth[0][7:])
-            except AccessError as error:
-                return await response({"error": str(error)}, error.status)(scope, receive, send)
             # Bound both API and MCP requests before either parser receives them.
             body = bytearray()
             while True:
@@ -153,6 +160,10 @@ def create_app():
                     return await response({"error": "Request too large"}, 413)(scope, receive, send)
                 if not event.get("more_body", False):
                     break
+            try:
+                authentication = await authenticate_request(scope, bytes(body))
+            except AccessError as error:
+                return await response({"error": str(error)}, error.status)(scope, receive, send)
             consumed = False
 
             async def replay():
@@ -168,11 +179,13 @@ def create_app():
                     message["headers"] = list(message.get("headers", [])) + [(b"cache-control", b"no-store")]
                 await send(message)
 
-            token = current_principal.set(actor)
+            token = current_principal.set(authentication.actor)
+            auth_token = current_authentication.set(authentication)
             try:
                 await app(scope, replay, no_cache)
             finally:
+                current_authentication.reset(auth_token)
                 current_principal.reset(token)
 
-    return Starlette(routes=[Mount("/", Guard())], lifespan=lifespan,
+    return Starlette(routes=[Mount(mount_path or "/", Guard())], lifespan=lifespan,
                      middleware=[Middleware(TrustedHostMiddleware, allowed_hosts=hosts)])

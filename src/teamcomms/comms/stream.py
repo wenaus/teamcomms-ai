@@ -6,14 +6,12 @@ import logging
 import time
 
 from django.conf import settings
-from django.utils import timezone
 import psycopg
 from psycopg import sql
 from starlette.responses import JSONResponse, StreamingResponse
 
-from teamcomms.service.access import AccessError, Principal, current_principal
+from teamcomms.service.access import AccessError, current_principal, current_authentication
 from teamcomms.service.dispatch import database_call
-from teamcomms.service.models import Credential
 from . import operations
 from .schemas import Stream
 
@@ -21,18 +19,9 @@ logger = logging.getLogger(__name__)
 RECHECK_SECONDS = 5
 
 
-def refresh(actor):
-    credential = Credential.objects.select_related("membership").filter(pk=actor.credential_id).first()
-    if (credential is None or credential.revoked_at is not None or not credential.membership.active
-            or (credential.expires_at and credential.expires_at <= timezone.now())):
-        raise AccessError("Credential no longer active", 401)
-    member = credential.membership
-    return Principal(member.participant_id, member.team_id, member.id, credential.id, member.role,
-                     frozenset(credential.scopes))
-
-
-def read_page(actor, query):
-    return operations.get_messages(refresh(actor), query)
+async def read_page(authentication, query):
+    actor = await authentication.refresh()
+    return await database_call(operations.get_messages, actor, query)
 
 
 def listener_params():
@@ -52,6 +41,7 @@ def event(name, data, cursor=None):
 
 async def stream_messages(request):
     actor = current_principal.get()
+    authentication = current_authentication.get()
     listener = None
     try:
         values = dict(request.query_params)
@@ -59,11 +49,11 @@ async def stream_messages(request):
             values["after"] = request.headers["last-event-id"]
         query = Stream.model_validate(values)
         # Validate scope/session/cursor before opening a dedicated listener.
-        await database_call(read_page, actor, query)
+        await read_page(authentication, query)
         listener = await psycopg.AsyncConnection.connect(**listener_params(), autocommit=True)
         await listener.execute(sql.SQL("LISTEN {}").format(sql.Identifier(operations.channel(query.session_id))))
         # LISTEN is committed before the authoritative read: closes the subscribe/read race.
-        first_page = await database_call(read_page, actor, query)
+        first_page = await read_page(authentication, query)
     except (ValueError, AccessError, psycopg.Error) as error:
         if listener is not None:
             await listener.close()
@@ -100,7 +90,7 @@ async def stream_messages(request):
                     # Includes receipt/retry changes to older deliveries; clients reconcile
                     # their durable pending queue without resetting the publication cursor.
                     yield event("refresh", {"session_id": str(query.session_id)})
-                page = await database_call(read_page, actor, query)
+                page = await read_page(authentication, query)
         except AccessError as error:
             yield event("error", {"error": str(error), "status": error.status})
         except psycopg.Error:

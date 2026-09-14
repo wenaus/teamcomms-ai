@@ -8,6 +8,10 @@ SQLite state records outgoing retries, replay cursors, and dispatch progress.
 
 ## Installation and enrollment
 
+For an [embedded installation](embedded.md), use the host's external TC base URL
+and existing bearer token. Participant mapping follows host authentication.
+The standalone provisioning instructions below apply to independently hosted TC.
+
 Install Python 3.11 or later, the native client, and the connector extra:
 
 ```sh
