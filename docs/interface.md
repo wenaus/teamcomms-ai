@@ -1,8 +1,9 @@
 # Browser interface
 
 The authenticated TeamComms root opens Entries. Shared navigation also exposes
-read-only session and Dialog views. All pages, assets, reads and writes use the
-installation's existing authentication boundary and URL prefix.
+the canonical [Pouch](pouch.md) and read-only session and Dialog views. All pages,
+assets, reads and writes use the installation's existing authentication boundary
+and URL prefix.
 
 ## Editor
 
@@ -61,6 +62,13 @@ revision and compares it with the current buffer. Restoration requires a clean
 buffer, confirmation and the current expected revision; it restores the complete
 saved state as a new attributed revision. Historical rows are unchanged.
 
+The Pouch opens at `/pouch` using this same editor. **Link to revision** and the
+history links open `/pouch?revision=N` (or `/entries/<UUID>?revision=N`) read-only.
+Pinned views disable saving, recovery into the buffer and restoration; **Open
+current document** returns to the editable current revision. Pouch saves keep
+the canonical route. **Export saved revision** downloads its attributable JSON
+package; **Download draft** remains a separate copy of the local text.
+
 ## Host integration
 
 Pass `browser_csrf_url` to `create_app` when the host supplies browser-session
@@ -72,10 +80,11 @@ request; the endpoint supplies no new identity or permission. Tokens are not
 stored in browser storage. The UI expects a host browser session; it supplies
 no standalone credential issuance or browser bearer-token manager.
 
-Pages are `/`, `/entries`, `/entries/<UUID>`, `/sessions` and `/dialog` under the
+Pages are `/`, `/pouch`, `/entries`, `/entries/<UUID>`, `/sessions` and `/dialog` under the
 configured mount. Assets are under `/assets/` in the wheel. The same authenticated
 ASGI route serves them, including when a parent router supplies `root_path`.
-No Django static alias, template setup or new application/migration is required.
+The asset-serving layer needs no Django static alias or template setup.
+Pouch requires its [Django app and migrations](pouch.md#initialization-and-integrity).
 Proxies must preserve content type, CSP, nosniff and referrer-policy headers.
 CSP permits only same-origin scripts and fonts, disallows active embedded
 objects and limits framing to the same origin. Markdown images may use HTTPS.

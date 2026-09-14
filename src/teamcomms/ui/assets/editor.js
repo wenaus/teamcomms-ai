@@ -10,10 +10,11 @@ window.TeamCommsEditor = class {
         'Ctrl-B': () => this.action('bold'), 'Cmd-B': () => this.action('bold'),
         'Ctrl-I': () => this.action('italic'), 'Cmd-I': () => this.action('italic'),
         'Ctrl-K': () => this.action('link'), 'Cmd-K': () => this.action('link'),
-        Tab: cm => cm.somethingSelected() ? cm.indentSelection('add') : cm.replaceSelection('  ', 'end'),
-        'Shift-Tab': cm => cm.indentSelection('subtract'),
+        Tab: cm => { if(!cm.getOption('readOnly')) return cm.somethingSelected() ? cm.indentSelection('add') : cm.replaceSelection('  ', 'end'); },
+        'Shift-Tab': cm => { if(!cm.getOption('readOnly')) cm.indentSelection('subtract'); },
         Esc: cm => { cm.setOption('extraKeys', {...cm.getOption('extraKeys'), Tab: false}); },
         Enter: cm => {
+          if(cm.getOption('readOnly'))return;
           const cur = cm.getCursor(), line = cm.getLine(cur.line);
           const m = line.match(/^(\s*)([-*+]|\d+[.)]) /);
           if (!m || cm.somethingSelected()) return cm.replaceSelection('\n');
@@ -34,6 +35,7 @@ window.TeamCommsEditor = class {
     // HTML tables (including spans) retain their topology; the preview sanitizes HTML.
     turndown.keep(['table']);
     this.cm.on('paste', (cm,event) => {
+      if(cm.getOption('readOnly'))return;
       const html = event.clipboardData?.getData('text/html');
       if (!html || !/<(ul|ol|table|a\s|strong|em|b>|i>|code|pre|h[1-6])\b/i.test(html)) return;
       try {
@@ -51,6 +53,7 @@ window.TeamCommsEditor = class {
   set value(text) { this.cm.setValue(text); }
   action(name) {
     const cm = this.cm, selected = cm.getSelection();
+    if(cm.getOption('readOnly'))return;
     cm.focus();
     if (name === 'undo' || name === 'redo') return cm[name]();
     const wrap = (before,after=before) => {

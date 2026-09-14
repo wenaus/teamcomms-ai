@@ -107,6 +107,10 @@ def create_app(*, host_auth=None, mount_path="", browser_csrf_url=None):
     mcp_app = mcp.streamable_http_app()
     from teamcomms.entries.api import register as register_entries
     entry_routes = register_entries(mcp, endpoint)
+    pouch_routes = []
+    if apps.is_installed("teamcomms.pouch"):
+        from teamcomms.pouch.api import register as register_pouch
+        pouch_routes = register_pouch(mcp, endpoint)
     from teamcomms.comms.api import register as register_comms
     comms_routes = register_comms(mcp, endpoint)
     from teamcomms.dialog.api import register as register_dialog
@@ -131,6 +135,7 @@ def create_app(*, host_auth=None, mount_path="", browser_csrf_url=None):
             Route("/api/credentials/revoke", endpoint({"POST": (operations.revoke_credential, CredentialReference)}), methods=["POST"]),
         ]),
         *entry_routes,
+        *pouch_routes,
         *comms_routes,
         *dialog_routes,
         *ui_routes,

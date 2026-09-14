@@ -16,7 +16,9 @@ native delivery, and local recovery, with explicit host configuration.
 [Mattermost and watchers](docs/mattermost.md) provide explicit channel routes,
 external provenance, thread preservation, and durable event publication.
 [Dialog](docs/dialog.md) provides attributed transcript capture, bounded history,
-and opt-in session bootstrap. Pouch, Inflight, and Capcom remain scaffolds.
+and opt-in session bootstrap. [Pouch](docs/pouch.md) is the team's canonical
+working document, with surgical edits, atomic bulk previews, and saved revision
+links. Inflight and Capcom remain scaffolds.
 
 [Embedded operation](docs/embedded.md) integrates TC with a host application's
 existing accounts, tokens, database, URL namespace, and deployment.

@@ -52,6 +52,13 @@ and revocation while a stream is open.
 
 ## Connectors
 
+`tests/check_editing_pouch.py` is a focused check of surgical editing, durable
+bulk plans and canonical Pouch integrity. It starts its own private socket-only
+PostgreSQL cluster and checks only these new operations and their HTTP/MCP
+bindings. It does not run pytest, the standalone startup/streaming checks or
+native connectors. Run `.venv/bin/python tests/check_editing_pouch.py` for that
+bounded check; it is not an alternative command for running the full suite.
+
 `tests/check_mattermost.py` checks only platform routing and watcher recovery
 using synthetic service adapters and private SQLite state. It covers reply
 threads, external provenance, reflection suppression, frozen inbound retries,

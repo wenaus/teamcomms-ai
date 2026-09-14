@@ -44,6 +44,19 @@
   }
   const canWrite=identity.scopes.includes('entries:write');
   let entry=null, base=null, revision=null, busy=false, loading=false, blocked=false, remote=null;
+  let isPouch=false, pinned=false;
+  const documentPath=()=>prefix+(isPouch?'/pouch':'/entries/'+entry.entry_id);
+  function links() {
+    $('permalink').href=documentPath()+'?revision='+revision;$('permalink').hidden=false;
+    $('current-document').href=documentPath();$('current-document').hidden=!pinned;
+    $('export-saved').hidden=!isPouch;
+  }
+  function writable() {
+    const allowed=canWrite&&!pinned;
+    editor.cm.setOption('readOnly',!allowed);
+    for(const id of ['title','tags','entry-status','priority','autosave','replace-one','rebase','take-remote','recover','save']) $(id).disabled=!allowed;
+    document.querySelectorAll('[data-edit]').forEach(b=>b.disabled=!allowed);
+  }
   let recovered=null, selectedVersion=null, timer=null, listOffset=null, historyOffset=null, previewNumber=0;
   let tab;
   try { tab=sessionStorage.getItem(pref+'tab')||crypto.randomUUID();sessionStorage.setItem(pref+'tab',tab); }
@@ -56,17 +69,17 @@
   const draftKey=()=>draftPrefix+(entry?.entry_id||'new')+':'+tab;
   function status(text,state='saved') { $('save-state').textContent=text;$('save-state').dataset.state=state; }
   function retain() {
-    if (!editor || !base) return;
+    if (!editor || !base || pinned) return;
     storageSet(draftKey(),JSON.stringify({entry_id:entry?.entry_id||null,revision,fields:fields(),base,kind:$('new-kind').value,slug:$('slug').value,ts:Date.now()}));
   }
   function changed() {
     if (loading) return;
-    $('restore-version').disabled=!canWrite||dirty()||busy||blocked;
+    $('restore-version').disabled=!canWrite||pinned||dirty()||busy||blocked;
     retain();
     if (blocked) status('Conflicted — draft retained','conflicted');
     else status(dirty()?'Unsaved — recovery draft kept':'Saved',dirty()?'unsaved':'saved');
     clearTimeout(timer);
-    if ($('autosave').checked && entry && dirty() && !blocked && canWrite) timer=setTimeout(()=>save(),1800);
+    if ($('autosave').checked && entry && dirty() && !blocked && canWrite && !pinned) timer=setTimeout(()=>save(),1800);
   }
   editor=new TeamCommsEditor($('content'),changed,()=>save(),()=>findOpen(),showError); theme();
   if(!canWrite) {
@@ -85,12 +98,19 @@
   $('autosave').onchange=()=>{storageSet(pref+'autosave',String($('autosave').checked));changed();};
   for(const id of ['title','tags','entry-status','priority','slug','new-kind']) $(id).addEventListener('input',changed);
   for(const button of document.querySelectorAll('[data-edit]')) button.onclick=()=>{setView('source');editor.action(button.dataset.edit);};
-  function download(value,name='teamcomms-draft.md') {
-    const url=URL.createObjectURL(new Blob([value],{type:'text/markdown;charset=utf-8'}));
+  function download(value,name='teamcomms-draft.md',type='text/markdown;charset=utf-8') {
+    const url=URL.createObjectURL(new Blob([value],{type}));
     const a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
   }
   $('export').onclick=()=>download(editor.value,(entry?.slug||'teamcomms-draft')+'.md');
+  $('export-saved').onclick=async()=>{
+    try {
+      const saved=await api('/api/pouch/export?'+new URLSearchParams({revision}));
+      download(JSON.stringify({...saved,revision_url:location.origin+prefix+saved.revision_path},null,2)+'\n',`pouch-revision-${saved.revision}.json`,'application/json');
+    }catch(e){showError(e.message);}
+  };
   function offerRecovery() {
+    if(pinned){$('recovery').hidden=true;return;}
     const candidates=[];
     try {
       for(let i=0;i<localStorage.length;i++) {
@@ -114,34 +134,39 @@
   };
   $('download-recovery').onclick=()=>download(recovered.fields.content,'recovered-draft.md');
   $('keep-current').onclick=()=>{ $('recovery').hidden=true; };
-  async function openEntry(id) {
+  async function openEntry(id,options={}) {
     if(busy)return;
     if(dirty()&&!confirm('Leave this entry? Your unsaved draft remains available for recovery.'))return;
     if(dirty())retain();clearTimeout(timer);
     busy=true;
     let result;
-    try {result=await api('/api/entries/read?'+new URLSearchParams({entry_id:id,max_content_length:40000}));}
+    try {
+      const params={max_content_length:40000};if(id)params.entry_id=id;
+      if(options.revision!==undefined&&options.revision!==null)params.revision=options.revision;
+      result=await api((options.pouch?'/api/pouch?':'/api/entries/read?')+new URLSearchParams(params));
+    }
     finally {busy=false;}
     if(dirty())retain();
+    isPouch=!!options.pouch;pinned=options.revision!==undefined&&options.revision!==null;
     entry=result;revision=result.revision;base=editable(result.state);blocked=false;remote=null;
     fill(base,true);$('empty').hidden=true;$('editor-pane').hidden=false;$('new-fields').hidden=true;
-    $('entry-label').textContent=`${result.slug||result.kind} · revision ${revision}`;
-    $('permalink').href=prefix+'/entries/'+id;$('permalink').hidden=false;
+    $('entry-label').textContent=`${isPouch?'Pouch':result.slug||result.kind} · revision ${revision}${pinned?' · read only':''}`;
+    links();
     $('conflict').hidden=true;$('comparison').hidden=true;$('history').hidden=false;
-    $('save').disabled=!canWrite;editor.cm.setOption('readOnly',!canWrite);
-    clearError();status('Saved');history.replaceState(null,'',prefix+'/entries/'+id);
+    writable();
+    clearError();status(pinned?'Saved revision — read only':'Saved');history.replaceState(null,'',documentPath()+(pinned?'?revision='+revision:''));
     document.title=(base.title||'Untitled')+' · TeamComms';
     offerRecovery();await listHistory();await setView(storageGet(pref+'view')||'source');
     editor.cm.refresh();
   }
   $('new-entry').onclick=()=>{
     if(busy || (dirty()&&!confirm('Start a new entry? The current draft will remain recoverable.')))return;
-    if(dirty())retain();clearTimeout(timer);entry=null;revision=null;blocked=false;remote=null;
+    if(dirty())retain();clearTimeout(timer);entry=null;revision=null;blocked=false;remote=null;isPouch=false;pinned=false;writable();
     base={title:'',content:'',tags:[],status:'active',priority:null};fill(base,true);
     $('slug').value='note-'+crypto.randomUUID();$('new-kind').value='note';
     $('empty').hidden=true;$('editor-pane').hidden=false;$('new-fields').hidden=false;
     $('history').hidden=true;$('comparison').hidden=true;$('conflict').hidden=true;
-    $('entry-label').textContent='New entry';$('permalink').hidden=true;status('New — save to create','unsaved');
+    $('entry-label').textContent='New entry';$('permalink').hidden=true;$('current-document').hidden=true;$('export-saved').hidden=true;status('New — save to create','unsaved');
     history.replaceState(null,'',prefix+'/entries');offerRecovery();setView('source');$('title').focus();
   };
   $('new-entry').disabled=!canWrite;
@@ -153,7 +178,7 @@
     status('Conflicted — draft retained','conflicted');
   }
   async function save() {
-    if(busy||blocked||!base||!canWrite)return;
+    if(busy||blocked||!base||!canWrite||pinned)return;
     if(entry&&!dirty()){status('Saved');return;}
     clearTimeout(timer);retain();const sent=fields();
     if(sent.content.length>40000){showError('This entry exceeds 40,000 characters. Download the draft or divide it into entries.');return;}
@@ -165,8 +190,8 @@
       const result=await api(entry?'/api/entries/update':'/api/entries',request);
       entry={...entry,...result,state:{...entry?.state,...sent}};revision=result.revision;base=sent;saved=true;
       $('new-fields').hidden=true;$('history').hidden=false;$('entry-label').textContent=`${entry.slug||entry.kind} · revision ${revision}`;
-      $('permalink').href=prefix+'/entries/'+entry.entry_id;$('permalink').hidden=false;
-      history.replaceState(null,'',prefix+'/entries/'+entry.entry_id);
+      links();
+      history.replaceState(null,'',documentPath());
       clearError();
       if(previousDraftKey!==draftKey())storageSet(previousDraftKey,JSON.stringify({fields:sent,base:sent,ts:Date.now()}));
       retain();status(dirty()?'Unsaved — newer typing retained':'Saved',dirty()?'unsaved':'saved');
@@ -229,7 +254,8 @@
       const row=document.createElement('div');row.className='revision';const button=document.createElement('button');button.textContent='Compare v'+r.revision;
       button.onclick=()=>compare(r.revision).catch(e=>showError(e.message));
       const text=document.createElement('small');text.textContent=`${new Date(r.created_at).toLocaleString()} · ${r.author_id}${r.restored_from?' · restored':''}`;
-      row.append(button,text);$('revision-list').append(row);
+      const link=document.createElement('a');link.href=documentPath()+'?revision='+r.revision;link.textContent='Open saved v'+r.revision;
+      row.append(button,link,text);$('revision-list').append(row);
     }
     historyOffset=result.next_offset;$('more-revisions').hidden=historyOffset===null;
   }
@@ -243,7 +269,7 @@
     selectedVersion=version;$('comparison').hidden=false;
     $('comparison-title').textContent=`Revision ${number} · ${version.state.title||'Untitled'}`;
     $('version-content').textContent=version.state.content;$('draft-content').textContent=draft;$('diff').textContent=result.diff||'No content differences.';
-    $('restore-version').disabled=!canWrite||dirty()||busy||blocked;
+    $('restore-version').disabled=!canWrite||pinned||dirty()||busy||blocked;
     $('restore-version').title=dirty()?'Save or reconcile your active draft before restoring a revision.':'';
     $('comparison').scrollIntoView({block:'nearest'});
   }
@@ -260,7 +286,7 @@
     offerRecovery();setView(storageGet(pref+'view')||'source');
   };
   $('restore-version').onclick=async()=>{
-    if(!selectedVersion||busy||blocked||dirty()||!confirm(`Restore all fields from revision ${selectedVersion.revision} as a new revision? Current history remains available.`))return;
+    if(!canWrite||pinned||!selectedVersion||busy||blocked||dirty()||!confirm(`Restore all fields from revision ${selectedVersion.revision} as a new revision? Current history remains available.`))return;
     const target=selectedVersion,before=fields();busy=true;
     try {
       const result=await api('/api/entries/restore',{entry_id:entry.entry_id,expected_revision:revision,revision:target.revision});
@@ -268,6 +294,7 @@
       if(same(fields(),before))fill(base);
       clearError();retain();status(dirty()?'Restored — newer typing retained':'Restored as revision '+revision,dirty()?'unsaved':'saved');
       $('entry-label').textContent=`${entry.slug||entry.kind} · revision ${revision}`;
+      links();
       await Promise.all([listHistory(),listEntries()]).catch(e=>showError('Restored; history/list refresh unavailable: '+e.message));$('comparison').hidden=true;
     } catch(e) {
       showError(e.message);
@@ -293,11 +320,26 @@
   }
   $('dialog-form').onsubmit=e=>{e.preventDefault();dialog().catch(e=>showError(e.message));};
   for(const a of document.querySelectorAll('header a')) a.addEventListener('click',e=>{if(busy){e.preventDefault();showError('A save is in progress. Your draft is retained.');}});
+  async function openPouch() {
+    try {await openEntry(null,{pouch:true,revision:new URLSearchParams(location.search).get('revision')});}
+    catch(e){
+      if(e.status!==404||location.search)throw e;
+      $('empty-title').textContent='The team’s Pouch';
+      $('empty-detail').textContent='One shared working document, with authorship and preserved revisions. Create it empty to begin.';
+      $('initialize-pouch').hidden=!canWrite;
+    }
+  }
+  $('initialize-pouch').onclick=async()=>{
+    $('initialize-pouch').disabled=true;
+    try {await api('/api/pouch/initialize',{});await openPouch();await listEntries();}
+    catch(e){showError(e.message);}
+    finally{$('initialize-pouch').disabled=false;}
+  };
   try {
     const path=location.pathname.slice(prefix.length);
     document.querySelectorAll('nav a').forEach(a=>{if(path.startsWith(new URL(a.href).pathname.slice(prefix.length)))a.setAttribute('aria-current','page');});
     if(path==='/sessions'){$('entries-view').hidden=true;$('directory-view').hidden=false;await sessions();}
     else if(path==='/dialog'){$('entries-view').hidden=true;$('dialog-view').hidden=false;await dialog();}
-    else {await listEntries();const id=path.match(/^\/entries\/([0-9a-f-]{36})$/)?.[1];if(id)await openEntry(id);}
+    else {await listEntries();if(path==='/pouch')await openPouch();else {const id=path.match(/^\/entries\/([0-9a-f-]{36})$/)?.[1];if(id)await openEntry(id,{revision:new URLSearchParams(location.search).get('revision')});}}
   }catch(e){showError(e.message);}
 })();

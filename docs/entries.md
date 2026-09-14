@@ -35,8 +35,8 @@ interfaces and integrity rules as those components are implemented.
 
 The encoded state is limited to 48,000 bytes. Unknown fields are rejected.
 Updates name the fields to change; all others remain intact. A supplied metadata
-object, tag list, or relationship list replaces that field in full. Fine-grained
-text, section, and bulk editing tools are scheduled separately.
+object, tag list, or relationship list replaces that field in full. The surgical
+operations below preserve unnamed metadata keys and individual relationships.
 
 A stale update returns HTTP 409 with the expected and current revision numbers,
 or an MCP tool error. It creates no partial state or history. Restoration copies
@@ -94,6 +94,89 @@ repeating the document. Reads default to 10,000 content characters and return
 when continuing a multi-part read. Revision lists return metadata without content.
 Search and revision pages default to 25 records, allow at most 100, and return
 `next_offset` when more records remain.
+
+## Surgical edits and atomic bulk plans
+
+All editing tools use authenticated Entries permissions, preserve revision
+history, and accept fields under `request` in MCP. HTTP bodies take those fields
+directly. The service's 64 KiB incoming request bound also applies to bulk plans.
+
+| HTTP | MCP tool | Contract |
+|---|---|---|
+| `POST /api/entries/target` | `read_entry_target` | Entry/revision plus range or `section: {heading, level?, occurrence?}` |
+| `POST /api/entries/edit` | `edit_entry` | `operation_id`, `entry_id`, `expected_revision`, `edits` |
+| `POST /api/entries/edits/preview` | `preview_entry_edits` | `operation_id`, explicit `entries` list |
+| `POST /api/entries/edits/apply` | `apply_entry_edits` | Saved `operation_id` |
+| `GET /api/entries/edits/read` | `get_entry_edit` | `operation_id`, optional `entry_id`, `diff_offset`, `max_diff_chars` |
+
+Each target in `entries` has `entry_id`, `expected_revision`, and 1–50 ordered
+`edits`. A plan selects 1–20 distinct entries; larger or query-based application
+is not supported. Resolve search results to explicit IDs/revisions before
+previewing. Preview fixes the selection and complete proposed states without
+writing Entry revisions. Each operation validates the resulting State bounds.
+
+| `op` | Additional fields and semantics |
+|---|---|
+| `replace` | Nonempty `old_text`, `new_text`; empty replacement deletes |
+| `insert` | Nonempty `anchor`, `text`, `position: before` or `after` |
+| `section` | Exact `heading`, `content`, optional heading `level` and 1-based `occurrence`; replaces body, preserving heading |
+| `append` | `content`, optional `separator` (default two newlines; used only between nonempty values) |
+| `set_content` | Explicit whole `content` replacement |
+| `fields` | `changes` naming title, tags, status or priority |
+| `metadata` | `set` object and `remove` key list; unnamed keys and nested values remain intact |
+| `relations` | `add` and `remove` lists of exact typed references; preserves others |
+
+Replace/insert require a unique literal, nonoverlapping match by default. An
+explicit 1-based `occurrence` selects one, or `all_matches: true` selects all;
+the two cannot be combined. Missing or ambiguous targets return HTTP 409/MCP
+error. Sections recognize ATX (`#`) headings outside backtick/tilde fences,
+include subsections until the next heading of equal or lower level, and reject
+ambiguous headings. Setext headings are not section selectors. Provide desired
+blank-line padding explicitly; a nonempty replacement before a following heading
+must end in a newline so that heading retains its structure.
+
+`read_entry_target` uses `content_offset` relative to the selected section body
+(or whole document). Its result includes absolute `target_start`, `target_end`
+and `content_offset`; `next_content_offset` is relative to that same target.
+Pin the returned revision and repeat the selector when continuing. Reads retain
+the document's total `content_length`; content defaults to 10,000 characters.
+
+For example, one atomic edit replaces a section and adds a metadata key:
+
+```json
+{
+  "operation_id": "6de715cb-96a2-4416-8c25-bf63efb9c94c",
+  "entry_id": "8f0c35ac-f7dd-44af-9f61-15fa7bc55e01",
+  "expected_revision": 3,
+  "edits": [
+    {"op": "section", "heading": "Plan", "content": "\nReviewed plan.\n\n"},
+    {"op": "metadata", "set": {"reviewed": true}}
+  ]
+}
+```
+
+Application locks all selected entries in UUID order and checks every revision
+and relationship before writing. It is all-or-none: each changed entry receives
+one revision; unchanged entries receive none. A conflict produces a durable
+`status: conflicted` result, with `conflicted` or `not_applied` per entry and no
+Entry writes. This is an HTTP 200 operation **outcome**, not successful editing;
+clients must inspect `status` and `result.entries`. Preview validation errors
+return ordinary HTTP errors and do not create a plan. Direct `edit_entry` uses
+the same prepare/apply path, so it can also return a conflicted outcome if a
+writer changes the document between preparation and application.
+
+Reuse the exact UUID and request after a lost response. Plans belong to their
+authenticated author and team; another author cannot inspect or apply them.
+PostgreSQL preserves plan inputs and terminal outcomes. A retry returns the saved
+outcome, even after later document edits. To reconcile a conflict, read the latest
+revisions, review a new preview, and use a fresh operation UUID; no implicit
+rebase occurs. Permissions are checked again on application and retry.
+
+Previews contain up to 1,000 diff characters per selected entry. Retrieve a
+complete diff with `get_entry_edit`, selecting its entry and following offsets;
+pages default to 8,000 and allow at most 20,000 characters. Diffs include content
+and other state fields and identify missing final newlines. Plans and receipts
+are retained with Entries; this release does not prune them.
 
 ## Search
 

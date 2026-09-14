@@ -46,7 +46,8 @@ def serve(port):
         path=request.url.path.removeprefix(PREFIX)
         if path=='/api/whoami':return JSONResponse({'name':'Browser reviewer','team_name':'Synthetic team','team_id':ENTRY,'participant_id':PERSON,'scopes':['entries:read','entries:write']})
         if path=='/browser-csrf':return JSONResponse({'header_name':'X-CSRFToken','token':'fixture-csrf'})
-        if path=='/api/entries/read':return JSONResponse(record(int(request.query_params['revision']) if 'revision' in request.query_params else None))
+        if path in {'/api/entries/read','/api/pouch'}:return JSONResponse(record(int(request.query_params['revision']) if 'revision' in request.query_params else None))
+        if path=='/api/pouch/export':return JSONResponse({**record(int(request.query_params['revision'])),'format':'teamcomms-pouch-export-v1','revision_path':'/pouch?revision='+request.query_params['revision']})
         if path=='/api/entries/revisions':return JSONResponse({'revisions':[record(i) for i in range(len(states),0,-1)],'next_offset':None})
         if path=='/api/entries' and request.method=='GET':return JSONResponse({'entries':[dict(record(),title=states[-1]['title'],modified_at='2026-09-14T17:00:00Z')],'next_offset':None})
         if path=='/_fixture/advance':
@@ -60,7 +61,7 @@ def serve(port):
             return JSONResponse(record())
         return JSONResponse({'error':'Unknown fixture request '+path},status_code=404)
     app=Starlette(routes=[Route('/api/whoami',fixture),Route('/browser-csrf',fixture),
-        Route('/api/entries',fixture,methods=['GET','POST']),Route('/api/entries/read',fixture),
+        Route('/api/entries',fixture,methods=['GET','POST']),Route('/api/entries/read',fixture),Route('/api/pouch',fixture),Route('/api/pouch/export',fixture),
         Route('/api/entries/revisions',fixture),Route('/api/entries/update',fixture,methods=['POST']),
         Route('/api/entries/restore',fixture,methods=['POST']),Route('/_fixture/advance',fixture,methods=['POST']),*ui.routes(PREFIX+'/browser-csrf')])
     async def guard(scope,receive,send):
@@ -92,6 +93,30 @@ def check():
             value=lambda:page.evaluate("document.querySelector('.CodeMirror').CodeMirror.getValue()")
             edit=lambda text:page.evaluate('(text)=>document.querySelector(".CodeMirror").CodeMirror.setValue(text)',text)
             assert value()==SOURCE
+            # Pouch follows the canonical route; a pinned revision cannot save.
+            page.goto(base+'/pouch?revision=1')
+            expect(page.locator('#save-state')).to_have_text('Saved revision — read only')
+            assert value()==SOURCE
+            expect(page.locator('#save')).to_be_disabled()
+            assert page.evaluate("document.querySelector('.CodeMirror').CodeMirror.getOption('readOnly')") is True
+            assert page.locator('#permalink').get_attribute('href')==PREFIX+'/pouch?revision=1'
+            page.click('#current-document')
+            page.locator('#editor-pane').wait_for(state='visible')
+            expect(page.locator('#save-state')).to_have_text('Saved')
+            assert page.url==base+'/pouch'
+            edit(SOURCE+'\nPouch draft\n');page.click('#save')
+            expect(page.locator('#save-state')).to_have_text('Saved')
+            assert page.url==base+'/pouch'
+            with page.expect_download() as download:
+                page.click('#export-saved')
+            exported=json.loads(Path(download.value.path()).read_text())
+            assert exported['revision']==2 and exported['state']['content'].endswith('Pouch draft\n'), exported
+            page.goto(base+'/entries/'+ENTRY+'?revision=1')
+            expect(page.locator('#save')).to_be_disabled()
+            page.goto(base+'/entries/'+ENTRY)
+            page.locator('#editor-pane').wait_for(state='visible')
+            expect(page.locator('#save-state')).to_have_text('Saved')
+            edit(SOURCE);page.click('#save');expect(page.locator('#save-state')).to_have_text('Saved')
             page.click('#rendered-mode');page.wait_for_selector('#rendered table')
             assert page.locator('#rendered table tr').count()==2
             assert page.locator('#rendered a').get_attribute('href')=='https://example.org/'
@@ -141,7 +166,7 @@ def check():
             page.screenshot(path=str(ROOT/'dist/interface-light.png'),full_page=True)
             assert not errors,errors
             browser.close()
-            print('PASS: prefixed assets, source/rendered structure, sanitization/math, failed save/reload recovery, concurrent conflict/diff/reconciliation, metadata preservation, restoration, long-document and in-flight typing preservation, HTML table paste, light/dark rendering')
+            print('PASS: canonical Pouch save/export, pinned read-only links, prefixed assets, source/rendered structure, sanitization/math, failed save/reload recovery, concurrent conflict/diff/reconciliation, metadata preservation, restoration, long-document and in-flight typing preservation, HTML table paste, light/dark rendering')
     finally:
         proc.terminate();proc.wait(timeout=10)
 

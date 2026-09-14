@@ -56,3 +56,13 @@ class RevisionReference(models.Model):
     target_entry = models.ForeignKey(Entry, on_delete=models.PROTECT)
     target_revision = models.ForeignKey(Revision, null=True, on_delete=models.PROTECT)
     relation = models.CharField(max_length=60)
+
+
+class EditPlan(models.Model):
+    id = models.UUIDField(primary_key=True, editable=False)
+    team = models.ForeignKey("teamcomms_service.Team", on_delete=models.PROTECT)
+    author = models.ForeignKey("teamcomms_service.Participant", on_delete=models.PROTECT)
+    request = models.JSONField()
+    prepared = models.JSONField()
+    result = models.JSONField(null=True)
+    created_at = models.DateTimeField(auto_now_add=True)

@@ -25,6 +25,14 @@ CALLS = {
 }
 DIALOG_CALLS = {"record_dialog": ("POST", "/events"), "get_dialog": ("GET", ""),
                 "session_bootstrap": ("POST", "/bootstrap")}
+ENTRY_CALLS = {"create_entry": ("POST", ""), "get_entry": ("GET", "/read"),
+    "update_entry": ("POST", "/update"), "restore_entry": ("POST", "/restore"),
+    "get_entry_revisions": ("GET", "/revisions"), "search_entries": ("POST", "/search"),
+    "read_entry_target": ("POST", "/target"), "edit_entry": ("POST", "/edit"),
+    "preview_entry_edits": ("POST", "/edits/preview"), "apply_entry_edits": ("POST", "/edits/apply"),
+    "get_entry_edit": ("GET", "/edits/read")}
+POUCH_CALLS = {"get_pouch": ("GET", ""), "initialize_pouch": ("POST", "/initialize"),
+               "get_pouch_changes": ("GET", "/changes"), "export_pouch": ("GET", "/export")}
 
 
 def state_path(config, client, native_id):
@@ -72,8 +80,10 @@ async def receive(args, config):
 async def call(args, config):
     service = ServiceClient(config)
     body = json.load(sys.stdin) if args.arguments == "-" else json.loads(args.arguments)
-    method, path = (DIALOG_CALLS if args.tool in DIALOG_CALLS else CALLS)[args.tool]
-    prefix = "/api/dialog" if args.tool in DIALOG_CALLS else "/api/comms"
+    prefix, methods = next((prefix, methods) for prefix, methods in (
+        ("/api/comms", CALLS), ("/api/dialog", DIALOG_CALLS),
+        ("/api/entries", ENTRY_CALLS), ("/api/pouch", POUCH_CALLS)) if args.tool in methods)
+    method, path = methods[args.tool]
     try:
         # Persist outgoing messages before attempting network publication.
         if args.tool == "send_message":
@@ -186,8 +196,8 @@ def main():
     recv.add_argument("--transcript", default="")
     recv.add_argument("--cwd", default=os.getcwd())
     recv.add_argument("--once", action="store_true")
-    helper = commands.add_parser("call", help="Invoke a Comms operation with JSON or stdin (-)")
-    helper.add_argument("tool", choices=sorted(CALLS | DIALOG_CALLS))
+    helper = commands.add_parser("call", help="Invoke a Comms, Dialog, Entries or Pouch operation with JSON or stdin (-)")
+    helper.add_argument("tool", choices=sorted(CALLS | DIALOG_CALLS | ENTRY_CALLS | POUCH_CALLS))
     helper.add_argument("arguments")
     commands.add_parser("flush", help="Retry the durable outgoing message queue")
     commands.add_parser("status", help="Inspect local session dispatch/recovery state")

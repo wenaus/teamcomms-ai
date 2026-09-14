@@ -85,7 +85,7 @@ def routes(browser_csrf_url=None):
         except AccessError as error:
             return JSONResponse({'error': str(error)}, status_code=error.status)
 
-    return [Route('/', page), Route('/entries', page), Route('/entries/{entry_id:uuid}', page),
+    return [Route('/', page), Route('/entries', page), Route('/entries/{entry_id:uuid}', page), Route('/pouch', page),
             Route('/sessions', page), Route('/dialog', page),
             Route('/api/entries/render', render, methods=['POST']),
             Route('/api/entries/compare', compare, methods=['POST']),

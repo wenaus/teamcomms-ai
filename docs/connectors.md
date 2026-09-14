@@ -119,7 +119,14 @@ listed below.
 
 ## Tools and recovery
 
-Sessions use the service's MCP tools, or the included HTTP helper:
+Sessions use the service's MCP tools, or the included HTTP helper. The helper
+also exposes Entries reads, surgical/bulk edits and Pouch lookup/initialization/
+export. All CLI JSON objects contain the request fields directly, without an
+outer `request` wrapper. Editing retry UUIDs belong in the original saved request;
+reuse that exact object after a lost response and inspect the returned status.
+For example, `call get_pouch '{}'` reads the current canonical document.
+
+Comms example:
 
 ```sh
 .venv/bin/teamcomms-connect --config /path/to/connector.json call list_sessions '{}'

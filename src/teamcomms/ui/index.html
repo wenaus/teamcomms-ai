@@ -22,7 +22,7 @@
 <body>
 <a class="skip" href="#workspace">Skip to workspace</a>
 <header><a class="brand" href="__PREFIX__/">TeamComms</a><nav aria-label="Main">
-<a href="__PREFIX__/entries">Entries</a><a href="__PREFIX__/sessions">Sessions</a><a href="__PREFIX__/dialog">Dialog</a>
+<a href="__PREFIX__/pouch">Pouch</a><a href="__PREFIX__/entries">Entries</a><a href="__PREFIX__/sessions">Sessions</a><a href="__PREFIX__/dialog">Dialog</a>
 </nav><span id="identity"></span><label>Theme <select id="theme"><option value="system">System</option><option value="light">Light</option><option value="dark">Dark</option></select></label></header>
 <div id="notice" role="alert" hidden></div>
 <main id="workspace" tabindex="-1">
@@ -30,9 +30,9 @@
 <aside aria-label="Find entries"><div class="section-head"><h1>Entries</h1><button id="new-entry">New</button></div>
 <form id="search-form"><label for="query">Search entries</label><input id="query" type="search" placeholder="Title, content, or slug"><div class="row"><select id="kind-filter" aria-label="Kind"><option value="">All kinds</option><option>note</option><option>document</option></select><select id="status-filter" aria-label="Status"><option value="active">Active</option><option value="archived">Archived</option><option value="">All states</option></select><button>Search</button></div></form>
 <div id="entry-list" class="entry-list"></div><button id="more-entries" hidden>More entries</button></aside>
-<article id="document"><div id="empty"><h2>A shared place to write</h2><p>Open an entry or create a note. Your changes retain their author and revision history.</p></div>
+<article id="document"><div id="empty"><h2 id="empty-title">A shared place to write</h2><p id="empty-detail">Open an entry or create a note. Your changes retain their author and revision history.</p><button id="initialize-pouch" hidden>Create the team's empty Pouch</button></div>
 <div id="editor-pane" hidden>
-<div class="section-head"><span id="entry-label"></span><a id="permalink">Link</a><span id="save-state" role="status" aria-live="polite">Saved</span><button id="save" class="primary">Save</button><button id="export">Download draft</button></div>
+<div class="section-head"><span id="entry-label"></span><a id="permalink">Link to revision</a><a id="current-document" hidden>Open current document</a><span id="save-state" role="status" aria-live="polite">Saved</span><button id="save" class="primary">Save</button><button id="export">Download draft</button><button id="export-saved" hidden>Export saved revision</button></div>
 <label class="title-label" for="title">Title</label><input id="title" maxlength="240" placeholder="Untitled" autocomplete="off">
 <div id="new-fields" class="row" hidden><label>Kind <select id="new-kind"><option>note</option><option>document</option></select></label><label>Slug <input id="slug" pattern="[a-z][a-z0-9-]{0,119}" placeholder="optional-readable-name"></label></div>
 <div class="row metadata"><label>Tags <input id="tags" placeholder="comma, separated"></label><label>Status <select id="entry-status"><option value="active">Active</option><option value="archived">Archived</option></select></label><label>Priority <input id="priority" type="number" min="1" placeholder="None"></label></div>

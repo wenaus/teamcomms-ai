@@ -6,9 +6,36 @@ from starlette.routing import Route
 from teamcomms.service.dispatch import invoke
 from . import operations
 from .schemas import CreateEntry, ListRevisions, ReadEntry, RestoreEntry, SearchEntries, UpdateEntry
+from . import editing
+from .edit_schemas import EditEntry, PreviewEdits, ApplyEdits, ReadEdit, ReadTarget
 
 
 def register(mcp, endpoint):
+    @mcp.tool()
+    async def edit_entry(request: EditEntry) -> dict:
+        """Apply surgical edits atomically. Reuse the exact operation ID/request on retry; inspect result.status."""
+        return await invoke(editing.edit_entry, request)
+
+    @mcp.tool()
+    async def preview_entry_edits(request: PreviewEdits) -> dict:
+        """Freeze at most 20 explicit entry/revision targets and preview changes without changing entries."""
+        return await invoke(editing.preview_edits, request)
+
+    @mcp.tool()
+    async def apply_entry_edits(request: ApplyEdits) -> dict:
+        """Apply a saved plan all-or-none. status=conflicted means no entries changed; retry returns saved outcome."""
+        return await invoke(editing.apply_edits, request)
+
+    @mcp.tool()
+    async def get_entry_edit(request: ReadEdit) -> dict:
+        """Read your durable edit outcome and optionally a bounded complete diff for a selected entry."""
+        return await invoke(editing.read_edit, request)
+
+    @mcp.tool()
+    async def read_entry_target(request: ReadTarget) -> dict:
+        """Read a character range or exact ATX section body, with absolute target offsets and pinned revision."""
+        return await invoke(editing.read_target, request)
+
     @mcp.tool()
     async def create_entry(request: CreateEntry) -> dict:
         """Create a note or document with an attributable first revision."""
@@ -42,6 +69,11 @@ def register(mcp, endpoint):
         return await invoke(operations.search_entries, request)
 
     return [
+        Route("/api/entries/edit", endpoint({"POST": (editing.edit_entry, EditEntry)}), methods=["POST"]),
+        Route("/api/entries/edits/preview", endpoint({"POST": (editing.preview_edits, PreviewEdits)}), methods=["POST"]),
+        Route("/api/entries/edits/apply", endpoint({"POST": (editing.apply_edits, ApplyEdits)}), methods=["POST"]),
+        Route("/api/entries/edits/read", endpoint({"GET": (editing.read_edit, ReadEdit)}), methods=["GET"]),
+        Route("/api/entries/target", endpoint({"POST": (editing.read_target, ReadTarget)}), methods=["POST"]),
         Route("/api/entries", endpoint({"GET": (operations.search_entries, SearchEntries),
                                        "POST": (operations.create_entry, CreateEntry)}), methods=["GET", "POST"]),
         Route("/api/entries/read", endpoint({"GET": (operations.read_entry, ReadEntry)}), methods=["GET"]),
