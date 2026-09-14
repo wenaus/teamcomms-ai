@@ -3,7 +3,7 @@
 Comms provides a shared session directory, routing groups and subscriptions,
 a durable mailbox, independent destination receipts, and authenticated streaming
 and replay. HTTP and MCP use the same application services and PostgreSQL store.
-Client injection is implemented by the Connectors component.
+Client injection is implemented by the [Connectors component](connectors.md).
 
 ## Source mapping
 
@@ -19,8 +19,8 @@ streaming extend that baseline. Attribution is retained in [NOTICE](../NOTICE).
 | PostgreSQL notification and durable recovery | `comms/operations.py`, `comms/stream.py` |
 | Session, message, and delivery records | `comms/models.py` and migrations |
 
-Paths are relative to `src/teamcomms/`. Native client integration and canonical
-Dialog capture are separate implementation steps described in the [design](design.md).
+Paths are relative to `src/teamcomms/`. Canonical Dialog capture is a subsequent
+implementation step described in the [design](design.md).
 
 ## Identity and directory
 

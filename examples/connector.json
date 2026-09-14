@@ -1,0 +1,11 @@
+{
+  "url": "http://127.0.0.1:8765",
+  "token_file": "./connector-token",
+  "host": "example-workstation",
+  "state_dir": "~/.local/state/teamcomms",
+  "resource_ids": [],
+  "group_ids": [],
+  "topics": [],
+  "greeting": true,
+  "work": ""
+}

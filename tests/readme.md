@@ -37,3 +37,25 @@ commit-ordered cursors, immutable evidence, and access bounds.
 `check_comms_stream.py` exercises two standalone service processes sharing the
 temporary database: cross-process wake-up, pre-connection recovery, cursor replay,
 and revocation while a stream is open.
+
+## Connectors
+
+`connectors/` checks crash recovery, lost receipt responses, replay deduplication,
+explicit retries, startup registry timing, enrollment recovery, and native
+Claude/Codex protocol frames. The database integration check enrolls two synthetic
+sessions and verifies greeting, publication, independent receipts, and receiver
+restart through the real HTTP operations. Native socket fixtures make no model calls.
+
+An optional installed Codex check exercises an owning Unix-socket app-server,
+ephemeral thread registration, and context injection without starting a model turn:
+
+```sh
+.venv/bin/python tests/check_codex_runtime.py
+```
+
+It disables hooks and configured MCP servers for that disposable runtime/thread,
+preserves the user's configuration files, and stops the runtime on exit. It uses
+the installed Codex authentication and configuration reader. Live model response,
+busy-turn delivery on installed clients, and macOS validation are separate from
+these automated checks; the current evidence is recorded in
+[Connectors](../docs/connectors.md#verification).

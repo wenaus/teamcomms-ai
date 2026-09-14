@@ -20,10 +20,12 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-test = ["pytest>=8,<10", "pytest-django>=4.9,<5", "httpx>=0.28,<1"]
+connectors = ["httpx>=0.28,<1", "websockets>=15,<16"]
+test = ["pytest>=8,<10", "pytest-django>=4.9,<5", "httpx>=0.28,<1", "websockets>=15,<16"]
 
 [project.scripts]
 teamcomms = "teamcomms.service.cli:main"
+teamcomms-connect = "teamcomms.connectors.cli:main"
 
 [tool.pytest.ini_options]
 DJANGO_SETTINGS_MODULE = "teamcomms.service.settings"

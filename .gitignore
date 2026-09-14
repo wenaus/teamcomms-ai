@@ -13,3 +13,4 @@ htmlcov/
 !.env.example
 owner-token
 entries-token
+connector-token

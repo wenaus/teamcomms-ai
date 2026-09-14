@@ -1,9 +1,10 @@
 TeamComms AI
 Copyright 2026 Torre Wenaus
 
-The service composition, Entries, and Comms implementations adapt the Django ORM,
-standalone MCP, entry versioning, serialized mutation, search, and mailbox patterns of
+The service composition, Entries, Comms, and Connectors implementations adapt the Django ORM,
+standalone MCP, entry versioning, serialized mutation, search, mailbox, and native client patterns of
 TJAI, Copyright Torre Wenaus, licensed under Apache-2.0.
 Source: https://github.com/wenaus/tjai
 Reference revision: 653a19639d47332f89983066ebbb10f0052dcc5f
-The source mapping is recorded in docs/service.md, docs/entries.md, and docs/comms.md.
+The source mapping is recorded in docs/service.md, docs/entries.md, docs/comms.md,
+and docs/connectors.md.
