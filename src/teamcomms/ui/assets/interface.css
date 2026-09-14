@@ -14,3 +14,6 @@ nav a[aria-current=page]{font-weight:700;text-decoration-thickness:2px}
 #work-summary{font-weight:600;margin-bottom:.75rem}
 #work-outcome{white-space:pre-wrap;margin:.75rem 0}
 #work-links a{display:inline-block;margin:.3rem .6rem .3rem 0}
+
+/* Capcom reuses the shared theme and the feed/current-state distinction. */
+.capcom label{display:block;margin:.6rem 0}.capcom label input,.capcom label textarea,.capcom label select{display:block;width:100%}.capcom textarea{min-height:6rem;background:var(--panel);color:var(--fg);border:1px solid var(--line);padding:.5rem}.capcom button{margin:.3rem .3rem .3rem 0}.capcom-card{padding:1rem 0;border-bottom:1px solid var(--line);overflow-wrap:anywhere}.capcom-card small{display:block}.capcom-content,.capcom pre{white-space:pre-wrap;overflow-wrap:anywhere}.capcom-card a{display:inline-block;margin-right:1rem}#capcom-current{padding:1rem;background:var(--panel);border:1px solid var(--line);border-radius:6px}

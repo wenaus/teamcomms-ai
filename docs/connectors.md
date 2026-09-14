@@ -269,3 +269,18 @@ renews while running. Failed renewal stops its process group; server reservation
 remain held until explicit completion/release or stopped-work reconciliation.
 See [claims and resource reservations](claims.md) for configuration, privileged
 command requirements and the exact limits of cooperating entrypoint coverage.
+
+## Opt-in attention controls
+
+Set `attention_controls: true` only in a selected receiver configuration to
+enable [Capcom attention policy](capcom.md#attention-policy). The receiver
+registers `attention-v1` and needs `capcom:read` and `capcom:write` alongside its
+existing Comms scopes. The default is false; no existing runtime changes merely
+because the server or package is upgraded.
+
+Set an owned session's policy through `set_attention_policy` or the Capcom UI.
+Record mode stores each routine destination without invoking the native client
+or marking the message considered. Batch and quiet policies defer new routine
+dispatches; original receipts and persisted uncertain dispatch reconciliation
+remain authoritative. Human messages, alarms and ordinary Comms bypass this
+filter. Existing receiver reconnects revisit due work without model polling.

@@ -21,7 +21,9 @@ working document, with surgical edits, atomic bulk previews, and saved revision
 links. [Inflight](docs/inflight.md) tracks structured work, persistent owners,
 accepted handoffs, Live/Done state and completion evidence. [Claims](docs/claims.md)
 add atomic resource reservations, persistent custodians and cooperating command
-guards. Capcom remains a scaffold.
+guards. [Capcom](docs/capcom.md) brings current work, retained events, decisions
+and authorized conversation into topical views, with explicit read markers and
+opt-in routine attention controls.
 
 [Embedded operation](docs/embedded.md) integrates TC with a host application's
 existing accounts, tokens, database, URL namespace, and deployment.

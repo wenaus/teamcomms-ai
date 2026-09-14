@@ -42,6 +42,7 @@
     try { const r=await fetch(config.csrf_url,{credentials:'same-origin',cache:'no-store',redirect:'error'});if(!r.ok)throw new Error('Browser CSRF setup failed.'); }
     catch(e){showError(e.message);}
   }
+  if(location.pathname.slice(prefix.length).startsWith('/capcom')){try{await new TeamCommsCapcom(prefix,api,identity,showError).start();}catch(e){showError(e.message);}return;}
   const workUI=new TeamCommsInflight(prefix,api,identity,showError), isWork=workUI.mode;
   const canWrite=identity.scopes.includes(isWork?'inflight:write':'entries:write');
   const readPath=isWork?'/api/inflight/read?':'/api/entries/read?';

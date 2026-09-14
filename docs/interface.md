@@ -119,3 +119,18 @@ work from this revision**, which preselects a saved source reference without
 creating anything until Save. Work controls record criteria, progress, executor
 assignment, accepted handoffs, completion evidence and explicit reopening.
 Generic Entries restore cannot alter work ownership or lifecycle.
+
+## Topics and attention
+
+[Capcom](capcom.md) at `/capcom` combines linked current work, fixed-revision
+documents, attributed Dialog excerpts and immutable notices. Its attention,
+following and all-topic filters share the existing theme and authentication.
+Open decisions require an explicit resolution; topic and exact-message read
+markers never acknowledge delivery. Canonical conversations preserve private
+audiences and show each authorized destination's transport and consideration
+state. Routine notices fold visually while retaining their original rows.
+
+An owned-session panel edits opt-in routine presentation and quiet periods.
+Unsupported receivers are labeled and retain immediate delivery. Alarms and
+human instructions bypass routine policy. Topic creation, reference edits and
+notice publication retain stable mutation IDs for uncertain browser retries.

@@ -22,6 +22,7 @@ class Configuration(BaseModel):
     topics: list[Annotated[str, Field(min_length=1, max_length=160)]] = Field(default_factory=list, max_length=30)
     greeting: bool = True
     work: str = Field(default="", max_length=1000)
+    attention_controls: bool = False
     dialog_capture: bool = False
     bootstrap: Bootstrap | None = None
 

@@ -35,6 +35,8 @@ class Receiver:
 
     async def register(self):
         metadata = await self.adapter.metadata()
+        if getattr(self.service.config, 'attention_controls', False):
+            metadata['capabilities'] = sorted(set(metadata.get('capabilities', self.registration.get('capabilities', []))) | {'attention-v1'})
         result = await self.service.post("/sessions", {**self.registration, **metadata})
         prior = self.store.get("session_id")
         if prior and prior != result["session_id"]:
@@ -108,7 +110,23 @@ class Receiver:
         await self.dispatch_pending()
 
     async def dispatch_pending(self):
-        for local in self.store.pending():
+        pending = self.store.pending()
+        decisions = {}
+        if getattr(self.service.config, 'attention_controls', False):
+            fresh = [row['id'] for row in pending if row['phase'] == 'new']
+            for start in range(0, len(fresh), 100):
+                result = await self.service.request('POST', '/api/capcom/attention/plan',
+                    {'session_id': self.session_id, 'delivery_ids': fresh[start:start+100]})
+                decisions.update({r['delivery_id']: r for r in result['presentations']})
+        for local in pending:
+            presentation = decisions.get(local['id'])
+            if presentation:
+                self.store.put('attention:' + local['id'], presentation)
+                if presentation['disposition'] == 'deferred':
+                    continue
+                if presentation['disposition'] in {'recorded', 'coalesced'}:
+                    self.store.update(local['id'], 'done', error='Attention: ' + presentation['disposition'] + '; no model consideration claimed')
+                    continue
             await self.dispatch(local)
 
     async def dispatch(self, local):

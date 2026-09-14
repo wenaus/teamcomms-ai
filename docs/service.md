@@ -146,7 +146,8 @@ authenticated requests. No cookie or loopback authentication bypass is present.
 An existing Django application includes `teamcomms.service.apps.ServiceConfig`
 and `teamcomms.entries.apps.EntriesConfig`, plus
 `teamcomms.comms.apps.CommsConfig`, `teamcomms.dialog.apps.DialogConfig`,
-`teamcomms.pouch.apps.PouchConfig` and `teamcomms.inflight.apps.InflightConfig`,
+`teamcomms.pouch.apps.PouchConfig`, `teamcomms.inflight.apps.InflightConfig`
+and `teamcomms.capcom.apps.CapcomConfig`,
 in `INSTALLED_APPS` and applies their migrations to the team's authoritative
 database. Host settings supply the PostgreSQL connection and explicit
 `ALLOWED_HOSTS`. `teamcomms.service.asgi.create_app()` respects an already

@@ -39,6 +39,12 @@ INFLIGHT_CALLS.update({"manage_work_resource": ("POST", "/resources/manage"),
     "claim_work": ("POST", "/claims"), "update_claim": ("POST", "/claims/update"),
     "get_claim": ("GET", "/claims/read"), "validate_claim": ("POST", "/claims/validate"),
     "record_guard_run": ("POST", "/claims/guard")})
+CAPCOM_CALLS = {"create_topic": ("POST", "/topics"), "list_topics": ("GET", "/topics"),
+    "update_topic": ("POST", "/topics/update"), "get_topic": ("GET", "/topics/read"),
+    "publish_notice": ("POST", "/notices"), "get_topic_notices": ("GET", "/notices"),
+    "resolve_decision": ("POST", "/decisions"), "follow_topic": ("POST", "/follow"),
+    "get_topic_conversation": ("GET", "/conversation"), "get_attention_policy": ("GET", "/attention"),
+    "set_attention_policy": ("POST", "/attention"), "plan_attention": ("POST", "/attention/plan")}
 POUCH_CALLS = {"get_pouch": ("GET", ""), "initialize_pouch": ("POST", "/initialize"),
                "get_pouch_changes": ("GET", "/changes"), "export_pouch": ("GET", "/export")}
 
@@ -90,7 +96,7 @@ async def call(args, config):
     body = json.load(sys.stdin) if args.arguments == "-" else json.loads(args.arguments)
     prefix, methods = next((prefix, methods) for prefix, methods in (
         ("/api/comms", CALLS), ("/api/dialog", DIALOG_CALLS),
-        ("/api/inflight", INFLIGHT_CALLS), ("/api/entries", ENTRY_CALLS), ("/api/pouch", POUCH_CALLS)) if args.tool in methods)
+        ("/api/capcom", CAPCOM_CALLS), ("/api/inflight", INFLIGHT_CALLS), ("/api/entries", ENTRY_CALLS), ("/api/pouch", POUCH_CALLS)) if args.tool in methods)
     method, path = methods[args.tool]
     try:
         # Persist outgoing messages before attempting network publication.
@@ -211,7 +217,7 @@ def main():
     guard.add_argument("--resource", action="append", required=True)
     guard.add_argument("arguments", nargs=argparse.REMAINDER)
     helper = commands.add_parser("call", help="Invoke a Comms, Dialog, Entries or Pouch operation with JSON or stdin (-)")
-    helper.add_argument("tool", choices=sorted(CALLS | DIALOG_CALLS | ENTRY_CALLS | POUCH_CALLS | INFLIGHT_CALLS))
+    helper.add_argument("tool", choices=sorted(CALLS | DIALOG_CALLS | ENTRY_CALLS | POUCH_CALLS | INFLIGHT_CALLS | CAPCOM_CALLS))
     helper.add_argument("arguments")
     commands.add_parser("flush", help="Retry the durable outgoing message queue")
     commands.add_parser("status", help="Inspect local session dispatch/recovery state")

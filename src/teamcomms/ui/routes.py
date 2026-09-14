@@ -51,7 +51,7 @@ def routes(browser_csrf_url=None):
     async def page(request):
         try:
             path = request.url.path.removeprefix(request.scope.get('root_path', ''))
-            current_principal.get().require('inflight:read' if path == '/inflight' or path.startswith('/inflight/') else 'entries:read')
+            current_principal.get().require('capcom:read' if path == '/capcom' or path.startswith('/capcom/') else 'inflight:read' if path == '/inflight' or path.startswith('/inflight/') else 'entries:read')
         except AccessError as error:
             return JSONResponse({'error': str(error)}, status_code=error.status)
         prefix = request.scope.get('root_path', '').rstrip('/')
@@ -94,7 +94,7 @@ def routes(browser_csrf_url=None):
             return JSONResponse({'error': str(error)}, status_code=error.status)
 
     return [Route('/', page), Route('/entries', page), Route('/entries/{entry_id:uuid}', page), Route('/pouch', page),
-            Route('/inflight', page), Route('/inflight/{entry_id:uuid}', page), Route('/sessions', page), Route('/dialog', page),
+            Route('/capcom', page), Route('/capcom/{topic_id:uuid}', page), Route('/inflight', page), Route('/inflight/{entry_id:uuid}', page), Route('/sessions', page), Route('/dialog', page),
             Route('/api/entries/render', render, methods=['POST']),
             Route('/api/entries/compare', compare, methods=['POST']),
             Mount('/assets', StaticFiles(directory=ROOT / 'assets'))]
