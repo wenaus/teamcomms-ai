@@ -8,3 +8,8 @@ Source: https://github.com/wenaus/tjai
 Reference revision: 653a19639d47332f89983066ebbb10f0052dcc5f
 The source mapping is recorded in docs/service.md, docs/entries.md, docs/comms.md,
 and docs/connectors.md.
+
+The browser editor controls and Markdown renderer adapt TJAI's entry_detail.html
+and scripts/md_render.py. Source: https://github.com/wenaus/tjai .
+Bundled CodeMirror, Turndown, Prism and KaTeX retain their MIT licenses in
+src/teamcomms/ui/assets/licenses/. See docs/interface.md.

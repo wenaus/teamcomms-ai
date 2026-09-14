@@ -6,6 +6,8 @@ The [design document](docs/design.md) describes the components, distributed arch
 
 The central service provides PostgreSQL migrations, team and participant
 identity, scoped credentials, and authenticated HTTP and MCP operations.
+The [browser interface](docs/interface.md) provides the shared Entries editor,
+recovery, version comparison, and session/Dialog views.
 [Entries](docs/entries.md) provides notes and documents with revision history,
 relationships, and search. [Comms](docs/comms.md) provides the session directory,
 routing, durable messages, delivery receipts, and HTTP streaming/replay.

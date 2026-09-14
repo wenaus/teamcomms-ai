@@ -14,7 +14,7 @@ from starlette.responses import JSONResponse
 from starlette.routing import Mount, Route
 
 
-def create_app(*, host_auth=None, mount_path=""):
+def create_app(*, host_auth=None, mount_path="", browser_csrf_url=None):
     """Return an ASGI app; an initialized host Django project supplies its settings."""
     if not apps.ready:
         os.environ.setdefault("DJANGO_SETTINGS_MODULE", "teamcomms.service.settings")
@@ -111,6 +111,8 @@ def create_app(*, host_auth=None, mount_path=""):
     comms_routes = register_comms(mcp, endpoint)
     from teamcomms.dialog.api import register as register_dialog
     dialog_routes = register_dialog(mcp, endpoint)
+    from teamcomms.ui.routes import routes as browser_routes
+    ui_routes = browser_routes(browser_csrf_url)
 
     @asynccontextmanager
     async def lifespan(app):
@@ -131,6 +133,7 @@ def create_app(*, host_auth=None, mount_path=""):
         *entry_routes,
         *comms_routes,
         *dialog_routes,
+        *ui_routes,
         Mount("/mcp", mcp_app),
     ], lifespan=lifespan)
 

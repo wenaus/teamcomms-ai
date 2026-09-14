@@ -63,6 +63,9 @@ relationship list is part of its versioned state. Subsequent edits preserve it
 unless explicitly changed; historical versions retain their original links.
 Search by relationship uses the source's current revision.
 
+The [browser editor](interface.md) uses these same APIs, with local recovery,
+explicit conflict reconciliation and version comparison/restoration.
+
 ## Interfaces
 
 `entries:read` permits content, revision, and search reads. `entries:write`

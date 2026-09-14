@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="teamcomms-config" content="__CONFIG__">
+<title>Entries · TeamComms</title>
+<link rel="stylesheet" href="__PREFIX__/assets/vendor/codemirror/5.65.18/codemirror.min.css">
+<link rel="stylesheet" href="__PREFIX__/assets/vendor/codemirror/5.65.18/theme/material-darker.min.css">
+<link rel="stylesheet" href="__PREFIX__/assets/vendor/katex/0.16.11/katex.min.css">
+<link rel="stylesheet" href="__PREFIX__/assets/interface.css">
+<script defer src="__PREFIX__/assets/vendor/codemirror/5.65.18/codemirror.min.js"></script>
+<script defer src="__PREFIX__/assets/vendor/codemirror/5.65.18/mode/markdown/markdown.min.js"></script>
+<script defer src="__PREFIX__/assets/vendor/turndown-7.2.0.js"></script>
+<script defer src="__PREFIX__/assets/vendor/prism/1.29.0/prism.min.js"></script>
+<script defer src="__PREFIX__/assets/vendor/prism/1.29.0/components/prism-python.min.js"></script>
+<script defer src="__PREFIX__/assets/vendor/prism/1.29.0/components/prism-bash.min.js"></script>
+<script defer src="__PREFIX__/assets/vendor/prism/1.29.0/components/prism-json.min.js"></script>
+<script defer src="__PREFIX__/assets/vendor/katex/0.16.11/katex.min.js"></script>
+<script defer src="__PREFIX__/assets/editor.js"></script>
+<script defer src="__PREFIX__/assets/interface.js"></script>
+</head>
+<body>
+<a class="skip" href="#workspace">Skip to workspace</a>
+<header><a class="brand" href="__PREFIX__/">TeamComms</a><nav aria-label="Main">
+<a href="__PREFIX__/entries">Entries</a><a href="__PREFIX__/sessions">Sessions</a><a href="__PREFIX__/dialog">Dialog</a>
+</nav><span id="identity"></span><label>Theme <select id="theme"><option value="system">System</option><option value="light">Light</option><option value="dark">Dark</option></select></label></header>
+<div id="notice" role="alert" hidden></div>
+<main id="workspace" tabindex="-1">
+<section id="entries-view" class="layout">
+<aside aria-label="Find entries"><div class="section-head"><h1>Entries</h1><button id="new-entry">New</button></div>
+<form id="search-form"><label for="query">Search entries</label><input id="query" type="search" placeholder="Title, content, or slug"><div class="row"><select id="kind-filter" aria-label="Kind"><option value="">All kinds</option><option>note</option><option>document</option></select><select id="status-filter" aria-label="Status"><option value="active">Active</option><option value="archived">Archived</option><option value="">All states</option></select><button>Search</button></div></form>
+<div id="entry-list" class="entry-list"></div><button id="more-entries" hidden>More entries</button></aside>
+<article id="document"><div id="empty"><h2>A shared place to write</h2><p>Open an entry or create a note. Your changes retain their author and revision history.</p></div>
+<div id="editor-pane" hidden>
+<div class="section-head"><span id="entry-label"></span><a id="permalink">Link</a><span id="save-state" role="status" aria-live="polite">Saved</span><button id="save" class="primary">Save</button><button id="export">Download draft</button></div>
+<label class="title-label" for="title">Title</label><input id="title" maxlength="240" placeholder="Untitled" autocomplete="off">
+<div id="new-fields" class="row" hidden><label>Kind <select id="new-kind"><option>note</option><option>document</option></select></label><label>Slug <input id="slug" pattern="[a-z][a-z0-9-]{0,119}" placeholder="optional-readable-name"></label></div>
+<div class="row metadata"><label>Tags <input id="tags" placeholder="comma, separated"></label><label>Status <select id="entry-status"><option value="active">Active</option><option value="archived">Archived</option></select></label><label>Priority <input id="priority" type="number" min="1" placeholder="None"></label></div>
+<div id="recovery" class="banner" hidden><span id="recovery-label"></span><button id="recover">Recover draft</button><button id="download-recovery">Download recovered copy</button><button id="keep-current">Keep current</button></div>
+<div id="conflict" class="banner" hidden><strong>A newer revision exists. Your draft is intact.</strong><p id="conflict-label"></p><button id="show-remote">Compare with latest</button><button id="rebase">Keep draft on latest revision</button><button id="take-remote">Load latest (keep recovery copy)</button></div>
+<div class="toolbar" role="toolbar" aria-label="Document tools">
+<button id="source-mode" aria-pressed="true">Source</button><button id="rendered-mode" aria-pressed="false">Rendered</button><span class="divider"></span>
+<button data-edit="undo" title="Undo (Ctrl/Cmd Z)">Undo</button><button data-edit="redo">Redo</button><button data-edit="bold" title="Bold (Ctrl/Cmd B)"><b>B</b></button><button data-edit="italic" title="Italic (Ctrl/Cmd I)"><i>I</i></button><button data-edit="heading">Heading</button><button data-edit="list">List</button><button data-edit="link" title="Link (Ctrl/Cmd K)">Link</button><button data-edit="table">Table</button><button data-edit="code">Code</button><button data-edit="dedent">Dedent</button><button id="find-toggle">Find</button>
+<label class="autosave"><input id="autosave" type="checkbox"> Autosave</label></div>
+<div id="find-bar" class="row" hidden><label>Find <input id="find-text" type="search"></label><button id="find-next">Next</button><label>Replace <input id="replace-text"></label><button id="replace-one">Replace selection</button><span id="find-status" role="status"></span></div>
+<div id="source"><label class="sr-only" for="content">Document source</label><textarea id="content" spellcheck="false"></textarea></div>
+<div id="rendered" class="prose" tabindex="0" hidden></div>
+<div class="section-head"><span id="position"></span><small>Ctrl/Cmd S save · Ctrl/Cmd F find · Escape then Tab leaves editor</small></div>
+<details id="history"><summary>Version history and comparison</summary><div id="revision-list"></div><button id="more-revisions" hidden>More revisions</button></details>
+<section id="comparison" hidden><div class="section-head"><h2 id="comparison-title">Compare</h2><button id="close-comparison">Close comparison</button><button id="restore-version">Restore selected revision</button></div><div class="compare-grid"><div><h3>Selected revision</h3><pre id="version-content" tabindex="0"></pre></div><div><h3>Your draft</h3><pre id="draft-content" tabindex="0"></pre></div></div><h3>Changes from selected revision</h3><pre id="diff" tabindex="0"></pre></section>
+</div></article></section>
+<section id="directory-view" hidden><h1>Sessions</h1><button id="refresh-sessions">Refresh</button><div id="session-list"></div></section>
+<section id="dialog-view" hidden><h1>Dialog</h1><form id="dialog-form" class="row"><label>Host <input id="dialog-host"></label><button>Load recent dialog</button></form><div id="dialog-list"></div></section>
+</main><noscript>This interface requires JavaScript. Entries remain available through the authenticated HTTP and MCP APIs.</noscript>
+</body></html>

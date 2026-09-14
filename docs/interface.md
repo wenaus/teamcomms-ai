@@ -1,0 +1,101 @@
+# Browser interface
+
+The authenticated TeamComms root opens Entries. Shared navigation also exposes
+read-only session and Dialog views. All pages, assets, reads and writes use the
+installation's existing authentication boundary and URL prefix.
+
+## Editor
+
+The editor adapts TJAI's CodeMirror 5.65.18 controls and document rendering.
+Source is the canonical text. **Rendered** displays the current buffer without
+rewriting it or resetting selection, scroll position or undo history. Returning
+to Source restores the same editor. Plain-text paste preserves whitespace;
+structured HTML paste uses Turndown for headings, lists, links and code. HTML
+tables retain their table structure, including spanning cells, in the source.
+The server sanitizes rendered HTML. Prism highlights code; KaTeX renders math.
+These browser dependencies are bundled with their licenses, without CDN calls.
+
+Controls cover bold, italic, headings, lists, links, tables, fenced code,
+indentation, dedent, undo/redo, literal search and replacement of a selected
+match. Enter continues list markers. Ctrl/Cmd S saves, Ctrl/Cmd F opens editor
+search, Ctrl/Cmd B/I format and Ctrl/Cmd K inserts a link. Escape then Tab leaves
+the editor. The source pane is vertically resizable. Theme selection supports
+system, light and dark; theme, source/rendered view and autosave preference
+persist in the browser for the installation path.
+
+Entries can be searched, opened by permanent UUID link, created with a readable
+slug, edited, archived and inspected by revision. The editor writes title,
+content, tags, status and priority. Other metadata and relationships remain
+intact. Existing Entries limits apply: 40,000 content characters and 48,000
+encoded state bytes. Reads request the complete supported content size.
+
+## Save and recovery
+
+Typing saves a local recovery draft, namespaced by installation path, team,
+participant, entry and browser tab. Drafts contain the loaded revision and base
+fields as well as the working fields. Reload offers divergent unsaved drafts
+for explicit recovery or download. Browser-storage errors remain visible and
+download remains available. These drafts contain document text: the browser
+profile must be appropriate for that team's data.
+
+Save state distinguishes saved, saving, unsaved, conflicted and failed. Optional
+autosave waits for a pause and applies only to existing entries. Creation is
+explicit. A stable new-entry slug prevents duplicate creation after a lost
+response; if its result is uncertain, search that slug before retrying.
+
+Only one save runs at a time. The submitted buffer is snapshotted separately
+from later typing; a successful save advances its base revision without replacing
+newer local text. A network error retains the draft. Navigation while dirty
+warns and retains recovery state. On page hiding or closing, the local draft is
+retained; server delivery during unload is not assumed.
+
+A stale save returns the existing revision conflict. The editor preserves the
+buffer and displays the latest revision, author and time. **Compare with
+latest** shows both texts and their unified diff. **Keep draft on latest
+revision** explicitly advances the base after confirmation; subsequent saving
+still validates that revision. **Load latest** retains a separate recovery copy
+of the displaced draft. No automatic text union or overwrite occurs.
+
+Version history is paginated and records authorship. Comparison reads a pinned
+revision and compares it with the current buffer. Restoration requires a clean
+buffer, confirmation and the current expected revision; it restores the complete
+saved state as a new attributed revision. Historical rows are unchanged.
+
+## Host integration
+
+Pass `browser_csrf_url` to `create_app` when the host supplies browser-session
+CSRF tokens. It must be a same-origin absolute path. A credentialed, uncached GET
+returns `{"header_name":"X-CSRFToken","token":"<masked host token>"}` and the
+host sets its own cookie when needed. The frontend sends that header and
+same-origin cookies on each POST. Host callbacks still validate the original
+request; the endpoint supplies no new identity or permission. Tokens are not
+stored in browser storage. The UI expects a host browser session; it supplies
+no standalone credential issuance or browser bearer-token manager.
+
+Pages are `/`, `/entries`, `/entries/<UUID>`, `/sessions` and `/dialog` under the
+configured mount. Assets are under `/assets/` in the wheel. The same authenticated
+ASGI route serves them, including when a parent router supplies `root_path`.
+No Django static alias, template setup or new application/migration is required.
+Proxies must preserve content type, CSP, nosniff and referrer-policy headers.
+CSP permits only same-origin scripts and fonts, disallows active embedded
+objects and limits framing to the same origin. Markdown images may use HTTPS.
+
+Two read-only operations supplement the existing Entries API:
+
+- `POST /api/entries/render`: `{content}` returns sanitized `{html}`.
+- `POST /api/entries/compare`: `{entry_id, revision, content}` returns `{diff}`
+  from the selected authorized revision to the supplied draft.
+
+Both require `entries:read` and ordinary host CSRF for cookie POSTs. Rendering
+never saves an entry. Comparison checks entry access through the shared service.
+
+## Source and checks
+
+UI controls derive from TJAI `tjai_app/templates/tjai_app/entry_detail.html`;
+Markdown sanitization and linkification derive from `scripts/md_render.py`.
+TeamComms retains its explicit revision semantics. See NOTICE and the bundled
+`assets/licenses/` notices. `tests/check_interface.py` runs a bounded local
+browser exercise against synthetic Entries responses; no production data or
+PostgreSQL cluster is used. It covers rendering, source retention, failed saves,
+concurrent edits, recovery, revision restoration and prefixed assets. Full-suite
+runs require the separate approval specified in AGENTS.md.
