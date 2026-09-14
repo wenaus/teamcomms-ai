@@ -162,8 +162,9 @@ instructions.
 |---|---|
 | Linux, Python 3.11 | PostgreSQL/HTTP integration, durable restart/retry tests, Claude JSONL socket and Codex idle/active WebSocket fixtures |
 | Codex CLI 0.154.0, Linux | Installed app-server initialization, loaded-thread discovery, and context injection into an idle ephemeral thread; no model invocation |
+| Codex CLI 0.154.0, live Linux sessions, 2026-09-14 | SWF installation with TC 7dd93ef: existing ec2dev and swf-testbed sessions received cross-host messages through `/prod/teamcomms/`; busy delivery used `turn/steer`, idle delivery used `turn/start`, and both received model acknowledgments. Receiver restart retained its session and cursor with no duplicate injection; the native app-server and existing TJAI connection remained running |
 | Claude Code 2.1.270, Linux | Installed version inspected; inherited socket frame exercised against a fixture |
-| Live Claude/Codex responses on Linux and macOS | Pending a bounded multi-host acceptance run |
+| Live Claude responses and macOS client acceptance | Pending; macOS setup is paused |
 
 [Tests](../tests/readme.md#connectors) describes the automated checks. The live
 acceptance run must establish idle and busy receipt on both clients and operating
