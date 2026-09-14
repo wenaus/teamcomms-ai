@@ -23,6 +23,8 @@ CALLS = {
     "get_message": ("GET", "/messages/read"), "record_delivery": ("POST", "/deliveries"),
     "acknowledge_message": ("POST", "/messages/acknowledge"), "get_delivery_history": ("GET", "/deliveries/history"),
 }
+DIALOG_CALLS = {"record_dialog": ("POST", "/events"), "get_dialog": ("GET", ""),
+                "session_bootstrap": ("POST", "/bootstrap")}
 
 
 def state_path(config, client, native_id):
@@ -70,7 +72,8 @@ async def receive(args, config):
 async def call(args, config):
     service = ServiceClient(config)
     body = json.load(sys.stdin) if args.arguments == "-" else json.loads(args.arguments)
-    method, path = CALLS[args.tool]
+    method, path = (DIALOG_CALLS if args.tool in DIALOG_CALLS else CALLS)[args.tool]
+    prefix = "/api/dialog" if args.tool in DIALOG_CALLS else "/api/comms"
     try:
         # Persist outgoing messages before attempting network publication.
         if args.tool == "send_message":
@@ -83,7 +86,7 @@ async def call(args, config):
             finally:
                 store.close()
         else:
-            result = await service.request(method, "/api/comms" + path, body)
+            result = await service.request(method, prefix + path, body)
         print(json.dumps(result, ensure_ascii=False))
     finally:
         await service.close()
@@ -104,6 +107,71 @@ async def flush(config):
         await service.close()
 
 
+async def record_dialog(args, config):
+    from .dialog import Recorder
+    session_id = str(UUID(args.session_id))
+    native_id = str(UUID(args.native_id))
+    service = ServiceClient(config)
+    directory = state_path(config, args.client, native_id) / "dialog"
+    try:
+        # Verify the selected transcript's destination before creating recording state.
+        page = await service.get("/sessions", host=config.host, include_offline=True, limit=100)
+        while True:
+            match = next((r for r in page["sessions"] if r["session_id"] == session_id), None)
+            if match or page["next_offset"] is None:
+                break
+            page = await service.get("/sessions", host=config.host, include_offline=True,
+                                     limit=100, offset=page["next_offset"])
+        client = "codex" if args.client == "codex_queue" else args.client
+        if not match or match["native_id"] != native_id or match["client"] != client:
+            raise ValueError("Recording session does not match selected host/client/native identity")
+        with session_lock(directory):
+            store = Store(directory)
+            try:
+                recorder = Recorder(service, store, session_id, args.client, args.transcript,
+                                    from_start=args.from_start)
+                if args.once:
+                    print(json.dumps({"recorded": await recorder.once()}))
+                else:
+                    stop = asyncio.Event()
+                    for sig in (signal.SIGINT, signal.SIGTERM):
+                        asyncio.get_running_loop().add_signal_handler(sig, stop.set)
+                    await recorder.run(stop)
+            finally:
+                store.close()
+    finally:
+        await service.close()
+
+
+async def reload_context(args, config):
+    from .adapters import NativeAdapter
+    from .dialog import bootstrap_context
+    if config.bootstrap is None:
+        raise ValueError("Configure bootstrap filters and bounds before reload")
+    service = ServiceClient(config)
+    try:
+        context = await bootstrap_context(service, config)
+        if args.native_id:
+            UUID(args.native_id)
+            if args.pid <= 1 or (args.client != "codex_queue" and not args.socket):
+                raise ValueError("Injection requires the existing native owner PID and socket")
+            adapter = NativeAdapter(args.client, args.native_id, args.socket, args.pid, name="history reload")
+            await adapter.metadata()
+            try:
+                if await adapter.setup(context):
+                    print(json.dumps({"state": "accepted", "chars": len(context)}))
+                else:
+                    from uuid import uuid4
+                    result = await adapter.send(context, "teamcomms-history", str(uuid4()))
+                    print(json.dumps(result))
+            except Exception as error:
+                raise RuntimeError("History injection outcome uncertain; reconcile native context before retry") from error
+        else:
+            print(context)
+    finally:
+        await service.close()
+
+
 def main():
     parser = argparse.ArgumentParser(prog="teamcomms-connect")
     parser.add_argument("--config", required=True, help="Explicit connector JSON configuration")
@@ -119,10 +187,22 @@ def main():
     recv.add_argument("--cwd", default=os.getcwd())
     recv.add_argument("--once", action="store_true")
     helper = commands.add_parser("call", help="Invoke a Comms operation with JSON or stdin (-)")
-    helper.add_argument("tool", choices=sorted(CALLS))
+    helper.add_argument("tool", choices=sorted(CALLS | DIALOG_CALLS))
     helper.add_argument("arguments")
     commands.add_parser("flush", help="Retry the durable outgoing message queue")
     commands.add_parser("status", help="Inspect local session dispatch/recovery state")
+    record = commands.add_parser("record", help="Record a selected native transcript with a durable cursor")
+    record.add_argument("--session-id", required=True)
+    record.add_argument("--native-id", required=True)
+    record.add_argument("--client", choices=["claude", "codex", "codex_queue"], required=True)
+    record.add_argument("--transcript", required=True)
+    record.add_argument("--from-start", action="store_true")
+    record.add_argument("--once", action="store_true")
+    reload = commands.add_parser("reload", help="Retrieve configured history; optionally inject into a selected session")
+    reload.add_argument("--native-id")
+    reload.add_argument("--client", choices=["claude", "codex", "codex_queue"], default="codex")
+    reload.add_argument("--socket", default="")
+    reload.add_argument("--pid", type=int, default=0)
     for name in ("codex", "claude"):
         launch = commands.add_parser(name, help=f"Launch native {name} with automatic Comms enrollment")
         launch.add_argument("arguments", nargs=argparse.REMAINDER)
@@ -139,12 +219,18 @@ def main():
             asyncio.run(call(args, config))
         elif args.command == "flush":
             asyncio.run(flush(config))
+        elif args.command == "record":
+            asyncio.run(record_dialog(args, config))
+        elif args.command == "reload":
+            asyncio.run(reload_context(args, config))
         elif args.command == "status":
-            for directory in sorted(config.state_dir.glob("*")):
+            directories = set(config.state_dir.glob("*")) | set(config.state_dir.glob("*/dialog"))
+            for directory in sorted(directories):
                 if (directory / "state.sqlite3").is_file():
                     store = Store(directory)
                     try:
                         print(json.dumps({"directory": str(directory), "session_id": store.get("session_id"),
+                            "setup_state": store.get("setup_state"), "capture_error": store.get("capture_error", ""),
                             "cursor": store.get("cursor", 0), "pending": [{"delivery_id": d["id"], "phase": d["phase"],
                             "error": d["error"]} for d in store.pending()], "outgoing": len(store.outgoing())}))
                     finally:

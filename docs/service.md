@@ -4,6 +4,7 @@ The service provides a PostgreSQL identity store and authenticated HTTP and MCP
 operations for team membership, participant discovery, and credential management.
 The [Entries interface](entries.md) adds versioned content and search.
 [Comms](comms.md) adds directory resources, sessions, routing, and message delivery.
+[Dialog](dialog.md) adds attributed recording, history retrieval, and session context.
 It uses Django 5.2 for ORM operations and migrations, Starlette for the ASGI
 application, and FastMCP from the official MCP Python SDK 1.x. Component storage
 and message delivery follow the [design](design.md).
@@ -86,6 +87,8 @@ identity or team through request fields.
 | `sessions:write` | Register, heartbeat, and subscribe own sessions |
 | `comms:read` | Read authored/received messages and own session streams |
 | `comms:write` | Publish messages and report own destination receipts |
+| `dialog:read` | Read shared team transcript history and bootstrap context |
+| `dialog:write` | Record transcript events for own sessions |
 
 Every authenticated member can inspect its own identity. Provisioned participants
 start as members and can receive directory-read, Entries, session, and Comms credentials. The
@@ -142,7 +145,7 @@ authenticated requests. No cookie or loopback authentication bypass is present.
 
 An existing Django application includes `teamcomms.service.apps.ServiceConfig`
 and `teamcomms.entries.apps.EntriesConfig`, plus
-`teamcomms.comms.apps.CommsConfig`, in `INSTALLED_APPS` and applies their
+`teamcomms.comms.apps.CommsConfig` and `teamcomms.dialog.apps.DialogConfig`, in `INSTALLED_APPS` and applies their
 migrations to the team's authoritative database. Host settings supply the PostgreSQL connection and explicit
 `ALLOWED_HOSTS`. `teamcomms.service.asgi.create_app()` respects an already
 initialized Django application and returns the HTTP/MCP ASGI application.

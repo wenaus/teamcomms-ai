@@ -30,6 +30,8 @@ class Receiver:
         self.config_path = config_path
         self.session_id = None
         self.registered = False
+        self.capture_task = None
+        self.capture_stop = asyncio.Event()
 
     async def register(self):
         metadata = await self.adapter.metadata()
@@ -39,9 +41,25 @@ class Receiver:
             raise RuntimeError("Local state belongs to a different service session; use a new state directory")
         self.session_id = result["session_id"]
         self.store.put("session_id", self.session_id)
-        if not self.store.get("instructions", False) and hasattr(self.adapter, "setup"):
-            if await self.adapter.setup(session_instructions(self.session_id, self.config_path)):
-                self.store.put("instructions", True)
+        if (not self.store.get("instructions", False) and hasattr(self.adapter, "setup")
+                and self.store.get("setup_state") not in {"injecting", "uncertain"}):
+            from .dialog import bootstrap_context
+            history = await bootstrap_context(self.service, self.service.config)
+            instructions = session_instructions(self.session_id, self.config_path)
+            if history:
+                instructions += "\n\n" + history
+            self.store.put("setup_state", "injecting")
+            try:
+                accepted = await self.adapter.setup(instructions)
+            except Exception as error:
+                self.store.put("setup_state", "uncertain")
+                logger.warning("Session context injection uncertain (%s); use explicit reload", type(error).__name__)
+            else:
+                self.store.put("setup_state", "accepted" if accepted else "deferred")
+                if accepted:
+                    self.store.put("instructions", True)
+                elif history:
+                    self.store.put("deferred_history", history)
         config = self.service.config
         for group in config.group_ids:
             await self.service.post("/subscriptions", {"session_id": self.session_id, "group_id": str(group)})
@@ -131,6 +149,8 @@ class Receiver:
             needs_instructions = not self.store.get("instructions", False)
             if needs_instructions:
                 text += "\n\n" + session_instructions(self.session_id, self.config_path)
+                if self.store.get("deferred_history"):
+                    text += "\n\n" + self.store.get("deferred_history")
             try:
                 result = await self.adapter.send(text, delivery["message"]["author_id"], delivery["message_id"])
             except Exception as error:
@@ -177,6 +197,8 @@ class Receiver:
                 try:
                     if not self.registered:
                         await self.register()
+                    if self.service.config.dialog_capture and self.capture_task is None:
+                        self.start_capture()
                     metadata = await self.adapter.metadata()
                     await self.service.post("/sessions/heartbeat", {"session_id": self.session_id,
                         **{k: v for k, v in metadata.items() if k in {"state", "name", "model", "effort"}}})
@@ -209,11 +231,38 @@ class Receiver:
                     await self.pause(stop, delay)
                     delay = min(delay * 2, 25)
         finally:
+            self.capture_stop.set()
+            if self.capture_task:
+                await self.capture_task
             if self.session_id:
                 try:
                     await self.service.post("/sessions/heartbeat", {"session_id": self.session_id, "state": "offline"})
                 except Exception as error:
                     logger.warning("Offline heartbeat failed; discovery expires normally (%s)", type(error).__name__)
+
+    def start_capture(self):
+        from pathlib import Path
+        from .cli import state_path
+        from .dialog import Recorder
+        from .state import Store, session_lock
+
+        async def capture():
+            directory = state_path(self.service.config, self.registration["client"], self.registration["native_id"]) / "dialog"
+            try:
+                with session_lock(directory):
+                    store = Store(directory)
+                    try:
+                        transcript = getattr(self.adapter, "transcript", "")
+                        if not transcript:
+                            raise ValueError("Native transcript path unavailable; use explicit record command")
+                        recorder = Recorder(self.service, store, self.session_id, self.registration["client"], Path(transcript))
+                        await recorder.run(self.capture_stop)
+                    finally:
+                        store.close()
+            except Exception as error:
+                logger.warning("Dialog recorder unavailable: %s", error)
+                self.store.put("capture_error", f"{type(error).__name__}: {error}")
+        self.capture_task = asyncio.create_task(capture())
 
     @staticmethod
     async def pause(stop, delay):

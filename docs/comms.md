@@ -19,8 +19,8 @@ streaming extend that baseline. Attribution is retained in [NOTICE](../NOTICE).
 | PostgreSQL notification and durable recovery | `comms/operations.py`, `comms/stream.py` |
 | Session, message, and delivery records | `comms/models.py` and migrations |
 
-Paths are relative to `src/teamcomms/`. Canonical Dialog capture is a subsequent
-implementation step described in the [design](design.md).
+Paths are relative to `src/teamcomms/`. [Dialog](dialog.md) verifies captured peer
+links against canonical messages and preserves their read permissions.
 
 ## Identity and directory
 

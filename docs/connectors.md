@@ -152,9 +152,67 @@ report cannot reach the service.
 
 Receipts distinguish socket progress, client acceptance, and model consideration.
 The receiving AI acknowledges after considering a message, with no acknowledgment
-reply or routine user-facing narration. Full Dialog capture and recent-history
-bootstrap are subsequent components; the context supplied here contains Comms
-instructions.
+reply or routine user-facing narration. [Dialog capture and recent-history
+bootstrap](dialog.md) are opt-in additions to the Comms instructions.
+
+## Dialog and bootstrap
+
+The connector credential needs `dialog:write` for recording, `dialog:read` for
+history, and `entries:read` for configured guidance. Embedded deployments grant
+these through their existing host policy. Add these fields to a selected config:
+
+```json
+{
+  "dialog_capture": true,
+  "bootstrap": {
+    "host": "example-workstation",
+    "hours": 24,
+    "limit": 40,
+    "max_chars": 16000,
+    "guidance_entry_ids": []
+  }
+}
+```
+
+The example is a fragment to merge with the URL/token/host configuration. Both
+features default to disabled. Omitting the bootstrap host selects the connector's
+host; participant, session, topic, and time filters are also supported. History
+and guidance share the rendered character budget. Guidance occupies at most a
+third of the budget when history is present; newest history has priority and
+selected events are presented chronologically.
+
+Wrapped Claude sessions receive history through their SessionStart context.
+Codex uses context-only injection through its owning app-server. Existing Claude
+receivers without a SessionStart context defer bootstrap to their first message;
+explicit `reload` can supply it sooner. Unavailable history produces a visible
+notice and enrollment continues. Ambiguous context injection remains uncertain
+in local status and requires explicit reload after reconciliation.
+
+For a selected existing session, run a recorder alongside its receiver:
+
+```sh
+teamcomms-connect --config /path/to/connector.json record \
+  --session-id TEAMCOMMS_SESSION_UUID --native-id NATIVE_SESSION_UUID \
+  --client codex --transcript /path/to/native-transcript.jsonl
+teamcomms-connect --config /path/to/connector.json reload
+teamcomms-connect --config /path/to/connector.json reload \
+  --client codex --native-id NATIVE_SESSION_UUID \
+  --socket /path/to/owning-codex.sock --pid NATIVE_OWNER_PID
+```
+
+`record` starts at the transcript's current end and publishes a coverage marker;
+restarts resume the saved cursor. `--from-start` explicitly includes earlier
+content. `--once` processes up to 100 complete lines and exits; repeat to continue.
+The recorder verifies the selected directory identity and uses a separate local
+lock. Automatic capture uses that same lock and saved state. Stop only the
+recorder process with SIGTERM to detach it from an existing session.
+
+Plain `reload` prints context; specifying the native identity, socket, and PID
+injects it. Claude and queue delivery retain the receipt limitations above.
+Recording recognizes native user/assistant text, visible commentary/final phases,
+and peer envelopes. It excludes reasoning, tools, and injected bootstrap context.
+Unknown native record types are not imported. Coverage is always labeled as
+potentially incomplete.
 
 ## Verification
 

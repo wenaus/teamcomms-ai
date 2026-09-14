@@ -38,9 +38,12 @@ def native_owner():
 async def register(config, native_id, name, cwd, model):
     service = ServiceClient(config)
     try:
-        return await service.post("/sessions", {"native_id": native_id, "host": config.host, "client": "claude",
+        result = await service.post("/sessions", {"native_id": native_id, "host": config.host, "client": "claude",
             "name": name, "workspace": cwd, "model": model, "delivery_mode": "claude_socket",
             "resource_ids": [str(r) for r in config.resource_ids]})
+        from .dialog import bootstrap_context
+        result["bootstrap_context"] = await bootstrap_context(service, config)
+        return result
     finally:
         await service.close()
 
@@ -67,4 +70,4 @@ def hook(config, config_path, data):
         store.put("instructions", True)
     finally:
         store.close()
-    return session_instructions(result["session_id"], config_path)
+    return session_instructions(result["session_id"], config_path) + "\n\n" + result.get("bootstrap_context", "")

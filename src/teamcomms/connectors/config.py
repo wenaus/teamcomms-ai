@@ -8,6 +8,7 @@ from urllib.parse import urlsplit
 from uuid import UUID
 from typing import Annotated
 from pydantic import BaseModel, ConfigDict, Field, model_validator
+from teamcomms.dialog.schemas import Bootstrap
 
 
 class Configuration(BaseModel):
@@ -21,6 +22,8 @@ class Configuration(BaseModel):
     topics: list[Annotated[str, Field(min_length=1, max_length=160)]] = Field(default_factory=list, max_length=30)
     greeting: bool = True
     work: str = Field(default="", max_length=1000)
+    dialog_capture: bool = False
+    bootstrap: Bootstrap | None = None
 
     @model_validator(mode="after")
     def endpoint(self):

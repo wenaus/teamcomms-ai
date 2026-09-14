@@ -11,7 +11,8 @@ relationships, and search. [Comms](docs/comms.md) provides the session directory
 routing, durable messages, delivery receipts, and HTTP streaming/replay.
 [Connectors](docs/connectors.md) packages Claude Code and Codex enrollment,
 native delivery, and local recovery, with explicit host configuration.
-The remaining component packages are scaffolds.
+[Dialog](docs/dialog.md) provides attributed transcript capture, bounded history,
+and opt-in session bootstrap. Pouch, Inflight, and Capcom remain scaffolds.
 
 [Embedded operation](docs/embedded.md) integrates TC with a host application's
 existing accounts, tokens, database, URL namespace, and deployment.

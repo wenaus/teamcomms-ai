@@ -109,6 +109,8 @@ def create_app(*, host_auth=None, mount_path=""):
     entry_routes = register_entries(mcp, endpoint)
     from teamcomms.comms.api import register as register_comms
     comms_routes = register_comms(mcp, endpoint)
+    from teamcomms.dialog.api import register as register_dialog
+    dialog_routes = register_dialog(mcp, endpoint)
 
     @asynccontextmanager
     async def lifespan(app):
@@ -128,6 +130,7 @@ def create_app(*, host_auth=None, mount_path=""):
         ]),
         *entry_routes,
         *comms_routes,
+        *dialog_routes,
         Mount("/mcp", mcp_app),
     ], lifespan=lifespan)
 

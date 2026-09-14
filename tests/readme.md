@@ -71,3 +71,20 @@ the installed Codex authentication and configuration reader. Live model response
 busy-turn delivery on installed clients, and macOS validation are separate from
 these automated checks; the current evidence is recorded in
 [Connectors](../docs/connectors.md#verification).
+
+## Dialog
+
+`tests/check_dialog.py` runs only the Dialog integrity and recorder recovery
+checks against its own temporary, socket-only PostgreSQL database. It does not
+invoke the suite, installed native clients, or deployed services. Checks cover
+concurrent source replay, source/session permissions, canonical peer attribution
+and visibility, database immutability, stable pagination, bounded bootstrap,
+HTTP/MCP contracts, and recorder recovery after a lost response or partial line.
+
+```sh
+.venv/bin/python tests/check_dialog.py
+```
+
+The fixture check excludes reasoning and tool payloads and verifies injected
+history is not recaptured as human input. Live cross-provider capture and fresh
+session continuity require separate, selected native sessions.

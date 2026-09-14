@@ -7,5 +7,7 @@
   "group_ids": [],
   "topics": [],
   "greeting": true,
-  "work": ""
+  "work": "",
+  "dialog_capture": false,
+  "bootstrap": null
 }

@@ -50,6 +50,7 @@ class NativeAdapter:
                 if self.native_id not in await client.loaded_threads():
                     raise TargetGone("Native thread is not loaded in the selected runtime")
                 thread = (await client.call("thread/read", {"threadId": self.native_id, "includeTurns": False}))["thread"]
+                self.transcript = self.transcript or thread.get("path") or ""
                 if thread.get("threadSource") == "system":
                     raise TargetGone("Internal threads cannot register as interactive sessions")
                 return {"name": thread.get("name") or self.name, "model": thread.get("model") or self.model,
