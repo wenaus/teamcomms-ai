@@ -8,6 +8,7 @@ class TeamCommsInflight {
   }
   setup(callbacks) {
     this.callbacks=callbacks;
+    this.claimUI=new TeamCommsClaims(this);
     if(!this.mode)return;
     const $=this.$;
     $('entries-view').querySelector('h1').textContent='Inflight';
@@ -33,7 +34,7 @@ class TeamCommsInflight {
       <div class="row"><label>Participant <select id="work-person"><option value="">None</option></select></label><label>Registered executor session (optional) <input id="work-session"></label><button id="work-assign">Assign executor</button></div>
       <label>Handoff reason <input id="work-offer-reason" maxlength="4000"></label><button id="work-offer">Offer ownership</button>
       <button id="work-accept">Accept handoff</button><button id="work-reject">Decline handoff</button><button id="work-cancel-offer">Cancel offer</button><p id="work-people-note"></p></details>
-      </details><div id="work-links"></div><div id="work-outcome"></div>
+      </details><div id="claim-controls"></div><div id="work-links"></div><div id="work-outcome"></div>
       <details id="work-new-links"><summary>Source and task relationships</summary>
       <label>Source document Entry ID <input id="work-source"></label><label>Saved source revision <input id="work-source-revision" type="number" min="1"></label>
       <label>Parent work ID <input id="work-parent"></label><label>Prerequisite work IDs (one per line) <textarea id="work-dependencies" rows="2"></textarea></label>
@@ -74,7 +75,7 @@ class TeamCommsInflight {
     $('work-new-links').hidden=pinned;
     const manager=this.identity.scopes.includes('inflight:write')&&!pinned&&(!entry||this.identity.role==='admin'||w.owner_id===this.identity.participant_id);
     $('work-criteria').disabled=!manager;$('work-visibility').disabled=!manager;
-    if(!entry){for(const id of ['work-source','work-source-revision','work-parent','work-dependencies'])$(id).value='';$('work-summary').textContent='You remain accountable until a named successor accepts a handoff.';return;}
+    if(!entry){$('claim-controls').replaceChildren();for(const id of ['work-source','work-source-revision','work-parent','work-dependencies'])$(id).value='';$('work-summary').textContent='You remain accountable until a named successor accepts a handoff.';return;}
     $('work-summary').textContent=`${w.form} · ${w.state} · Owner ${entry.owner_name||w.owner_id} · Executor ${entry.executor_name||w.executor_id||'unassigned'}`+
       (!pinned&&entry.current_presence&&!entry.current_presence.owner_online?' · owner has no online session':'');
     $('work-parent').value=w.parent_id||'';$('work-dependencies').value=w.dependencies.join('\n');
@@ -83,7 +84,8 @@ class TeamCommsInflight {
     const successor=!pinned&&w.handoff?.successor_id===this.identity.participant_id;
     $('work-accept').hidden=!successor;$('work-reject').hidden=!successor;$('work-cancel-offer').hidden=!(manager&&w.handoff);
     for(const id of ['work-assign','work-offer','work-graph'])$(id).disabled=!manager||['completed','failed','canceled'].includes(w.state);
-    $('work-transition').disabled=pinned||!this.identity.scopes.includes('inflight:write');
+    $('work-transition').disabled=pinned||(!manager&&!this.canEdit(entry))||!!entry.current_claim;
+    this.claimUI.display(entry,pinned);
     $('work-outcome').textContent=[w.blockers&&'Blocker: '+w.blockers,w.outcome&&'Outcome: '+w.outcome,...w.evidence].filter(Boolean).join('\n');
     $('work-links').replaceChildren();
     const link=(path,text)=>{const a=document.createElement('a');a.href=this.prefix+path;a.textContent=text;$('work-links').append(a,document.createTextNode(' '));};
@@ -108,8 +110,9 @@ class TeamCommsInflight {
       try {
         const resolved=await this.api(prior.path,pending.request);
         try{sessionStorage.removeItem(key);}catch{}this.pending=null;
-        const link=document.createElement('a');link.href=this.prefix+resolved.current_path;
-        link.textContent='Open the work saved by your previous request';this.$('work-controls').prepend(link);
+        const savedPath=resolved.current_path||(resolved.claim?.entry_id?'/inflight/'+resolved.claim.entry_id:null);
+        if(savedPath){const link=document.createElement('a');link.href=this.prefix+savedPath;
+          link.textContent='Open the work saved by your previous request';this.$('work-controls').prepend(link);}
         throw new Error('The previous uncertain request succeeded. Open that work before submitting different changes.');
       }catch(error){
         if(error.status&&error.status<500){try{sessionStorage.removeItem(key);}catch{}this.pending=null;}

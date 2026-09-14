@@ -31,7 +31,9 @@ def register(mcp, endpoint):
         """Read durable attributed work change notices and fixed-revision links; does not broadcast."""
         return await invoke(ops.get_work_changes, request)
 
-    return [Route("/api/inflight", endpoint({"GET": (ops.list_work, ListWork), "POST": (ops.create_work, CreateWork)}), methods=["GET", "POST"]),
+    from .claim_api import register as register_claims
+    claim_routes = register_claims(mcp, endpoint)
+    return [*claim_routes, Route("/api/inflight", endpoint({"GET": (ops.list_work, ListWork), "POST": (ops.create_work, CreateWork)}), methods=["GET", "POST"]),
         Route("/api/inflight/read", endpoint({"GET": (ops.get_work, ReadWork)})),
         Route("/api/inflight/changes", endpoint({"GET": (ops.get_work_changes, Changes)})),
         Route("/api/inflight/mutate", endpoint({"POST": (ops.mutate_work, MutateWork)}), methods=["POST"])]

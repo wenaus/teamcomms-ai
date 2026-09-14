@@ -202,6 +202,8 @@ def mutate_work(actor, request):
         raise AccessError("STALE_GENERATION: ownership changed", 409)
     change = request.change
     action = change.action
+    if work.claims.filter(state="active").exists() and action not in {"edit", "sources", "graph"}:
+        raise AccessError("Work has a claim; use its fenced lifecycle and reconcile before handoff or reassignment", 409)
     if work.state in DONE and action != "reopen":
         raise AccessError("Closed work requires explicit reopen", 409)
     if action in {"edit", "progress", "transition", "sources"}:
@@ -312,6 +314,12 @@ def get_work(actor, request):
         "owner_online": online(Session.objects.filter(membership__team_id=actor.team_id,
             membership__participant_id=work.owner_id)).exists(),
         "executor_session_online": bool(work.session_id and online(Session.objects.filter(pk=work.session_id)).exists())}
+    from .claims import claim_record
+    current_claim = work.claims.filter(state="active").select_related("offer", "work__entry", "holder").first()
+    value["current_claim"] = claim_record(current_claim) if current_claim else None
+    offer = work.offers.filter(state="open", generation=work.generation).first()
+    value["current_offer"] = {"offer_id":str(offer.id), **offer.specification,
+                              "expires_at":offer.expires_at.isoformat()} if offer else None
     value["owner_name"] = work.owner.name if request.revision is None else None
     value["executor_name"] = work.executor.name if work.executor_id and request.revision is None else None
     targets = {str(e.pk): e.kind for e in Entry.objects.filter(team_id=actor.team_id,

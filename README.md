@@ -19,7 +19,9 @@ external provenance, thread preservation, and durable event publication.
 and opt-in session bootstrap. [Pouch](docs/pouch.md) is the team's canonical
 working document, with surgical edits, atomic bulk previews, and saved revision
 links. [Inflight](docs/inflight.md) tracks structured work, persistent owners,
-accepted handoffs, Live/Done state and completion evidence. Capcom remains a scaffold.
+accepted handoffs, Live/Done state and completion evidence. [Claims](docs/claims.md)
+add atomic resource reservations, persistent custodians and cooperating command
+guards. Capcom remains a scaffold.
 
 [Embedded operation](docs/embedded.md) integrates TC with a host application's
 existing accounts, tokens, database, URL namespace, and deployment.

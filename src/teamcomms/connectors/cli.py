@@ -34,6 +34,11 @@ ENTRY_CALLS = {"create_entry": ("POST", ""), "get_entry": ("GET", "/read"),
 INFLIGHT_CALLS = {"create_work": ("POST", ""), "list_work": ("GET", ""),
     "get_work": ("GET", "/read"), "mutate_work": ("POST", "/mutate"),
     "get_work_changes": ("GET", "/changes")}
+INFLIGHT_CALLS.update({"manage_work_resource": ("POST", "/resources/manage"),
+    "list_work_resources": ("GET", "/resources"), "offer_work": ("POST", "/offers"),
+    "claim_work": ("POST", "/claims"), "update_claim": ("POST", "/claims/update"),
+    "get_claim": ("GET", "/claims/read"), "validate_claim": ("POST", "/claims/validate"),
+    "record_guard_run": ("POST", "/claims/guard")})
 POUCH_CALLS = {"get_pouch": ("GET", ""), "initialize_pouch": ("POST", "/initialize"),
                "get_pouch_changes": ("GET", "/changes"), "export_pouch": ("GET", "/export")}
 
@@ -199,6 +204,12 @@ def main():
     recv.add_argument("--transcript", default="")
     recv.add_argument("--cwd", default=os.getcwd())
     recv.add_argument("--once", action="store_true")
+    guard = commands.add_parser("guard", help="Run one foreground command under an existing fenced resource claim")
+    guard.add_argument("--guard-config", required=True)
+    guard.add_argument("--claim-id", required=True)
+    guard.add_argument("--generation", type=int, required=True)
+    guard.add_argument("--resource", action="append", required=True)
+    guard.add_argument("arguments", nargs=argparse.REMAINDER)
     helper = commands.add_parser("call", help="Invoke a Comms, Dialog, Entries or Pouch operation with JSON or stdin (-)")
     helper.add_argument("tool", choices=sorted(CALLS | DIALOG_CALLS | ENTRY_CALLS | POUCH_CALLS | INFLIGHT_CALLS))
     helper.add_argument("arguments")
@@ -230,6 +241,9 @@ def main():
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
     try:
         config = load(args.config)
+        if args.command == "guard":
+            from .guard import run_guard
+            return asyncio.run(run_guard(args, config))
         if args.command == "receive":
             asyncio.run(receive(args, config))
         elif args.command == "call":

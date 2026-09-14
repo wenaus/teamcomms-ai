@@ -12,7 +12,8 @@ authorized mutations. Neither grants production rights. New work is planned and
 owned by its authenticated creator. The owner is a stable participant, separate
 from an optional executor and that executor's registered session. Disconnection
 never clears ownership or authorizes another executor. Resource associations are
-informational; enforced reservations and execution fencing follow in stage12.
+informational until an explicit [claim and reservation](claims.md) acquires
+them. Guarded commands use the configured cooperating entrypoints.
 
 Owners and team administrators control lifecycle, dependencies and assignment.
 The current executor may edit descriptions and report active/blocked progress or
@@ -75,3 +76,14 @@ attributed notices and fixed revision paths. No broadcast or job is triggered.
 Install `teamcomms.inflight.apps.InflightConfig`; apply Inflight migrations through
 the host's normal Django migration process. Migration creates schema only. No TJAI
 import, new credentials, automatic task creation or session launch is performed.
+
+
+## Claimed execution
+
+The [claims contract](claims.md) adds explicit eligible work offers, atomic
+resource sets, lease renewal and generation-checked progress/completion. An
+active claim, including an expired-held claim, must be stopped/reconciled before
+generic reassignment, handoff or lifecycle changes. The work response separates
+`current_claim` and `current_offer` from the immutable saved revision. Renewals
+retain receipts without creating document revisions; meaningful claim changes
+appear in ordinary work history.

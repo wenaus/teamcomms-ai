@@ -259,3 +259,13 @@ Attribution is retained in [NOTICE](../NOTICE).
 | `startup.py`, `launch_codex.py` | `startup.py`, `launcher.py`: explicit configuration, reversible wrappers, native lifecycle supervision |
 
 Paths in the final column are relative to `src/teamcomms/connectors/`.
+
+## Guarded work commands
+
+The explicit `guard` subcommand uses an existing Inflight claim and a local
+resource allowlist to protect one foreground command. It holds shared POSIX
+locks, validates generation and lease, records command admission/stopping, and
+renews while running. Failed renewal stops its process group; server reservations
+remain held until explicit completion/release or stopped-work reconciliation.
+See [claims and resource reservations](claims.md) for configuration, privileged
+command requirements and the exact limits of cooperating entrypoint coverage.
