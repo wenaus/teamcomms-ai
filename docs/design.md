@@ -71,6 +71,12 @@ Local connector state includes receive cursors, pending outgoing messages, and p
 
 The central Python service exposes HTTP APIs, streaming delivery, and Model Context Protocol (MCP) tools. Application services implement directory and membership operations, entry editing, dialog capture, publication and receipts, task transitions, claims, and reservations. Human interfaces, programs, and AI connectors use the same validation and authorization rules.
 
+Django 5.2 supplies the ORM and schema migrations. The standalone ASGI application
+uses Starlette for HTTP routing and the official MCP Python SDK for MCP tools.
+Both interfaces call the same synchronous application services through an async
+database boundary. Configuration, identity, and authorization are shared.
+The [service reference](service.md) documents the implemented endpoints and setup.
+
 The service can run independently or be integrated into a host application. Host integration supplies authentication, configuration, interface mounting, and operational policy. The monorepo contains the server, internal components, connectors, and shared interfaces under one development and release workflow.
 
 ### Database

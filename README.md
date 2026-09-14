@@ -4,8 +4,9 @@ A distributed collaboration system for humans, AI sessions, programmatic systems
 
 The [design document](docs/design.md) describes the components, distributed architecture, and implementation sequence, including initial Claude Code and Codex support.
 
-The repository currently provides an installable Python package scaffold. Service
-and component behavior are under development.
+The central service provides PostgreSQL migrations, team and participant
+identity, scoped credentials, and authenticated HTTP and MCP directory
+operations. The other component packages are scaffolds.
 
 ## Repository structure
 
@@ -33,18 +34,25 @@ Python 3.11 or later is required. From the repository root:
 
 ```sh
 python3 -m venv .venv
-.venv/bin/python -m pip install --editable .
+.venv/bin/python -m pip install --editable '.[test]'
 .venv/bin/python -c "import teamcomms; print(teamcomms.__file__)"
 ```
 
-The scaffold has no runtime dependencies and imports without a database,
-credentials, or a TJAI installation. Package builds use setuptools:
+The package uses Django 5.2, PostgreSQL, and the official MCP Python SDK.
+[Service setup](docs/service.md) covers database provisioning, credentials,
+startup, and the API. Package builds use setuptools:
 
 ```sh
 .venv/bin/python -m pip wheel --no-deps --wheel-dir dist .
 ```
 
-The [test directory](tests/readme.md) and [example directory](examples/readme.md)
-describe their scope.
+With PostgreSQL server tools installed, the [service checks](tests/readme.md)
+run against a temporary database cluster:
+
+```sh
+.venv/bin/python tests/run_postgres.py -q
+```
+
+The [example directory](examples/readme.md) describes the planned integrations.
 
 Licensed under [Apache 2.0](LICENSE).
