@@ -3,6 +3,7 @@
 The service provides a PostgreSQL identity store and authenticated HTTP and MCP
 operations for team membership, participant discovery, and credential management.
 The [Entries interface](entries.md) adds versioned content and search.
+[Comms](comms.md) adds directory resources, sessions, routing, and message delivery.
 It uses Django 5.2 for ORM operations and migrations, Starlette for the ASGI
 application, and FastMCP from the official MCP Python SDK 1.x. Component storage
 and message delivery follow the [design](design.md).
@@ -80,9 +81,12 @@ identity or team through request fields.
 | `credentials:write` | Issue or revoke team credentials; also requires admin membership |
 | `entries:read` | Read entries, revision history, and search results |
 | `entries:write` | Create, update, and restore notes and documents |
+| `sessions:write` | Register, heartbeat, and subscribe own sessions |
+| `comms:read` | Read authored/received messages and own session streams |
+| `comms:write` | Publish messages and report own destination receipts |
 
 Every authenticated member can inspect its own identity. Provisioned participants
-start as members and can receive directory-read and Entries credentials. The
+start as members and can receive directory-read, Entries, session, and Comms credentials. The
 bootstrap administrator can issue additional credentials to its own identity. Issuance can only grant scopes
 held by the issuing credential. API operations do not promote membership roles.
 
@@ -118,8 +122,8 @@ HTTP POST bodies are JSON objects. MCP mutation tools accept the same object
 under a `request` argument; read-tool arguments are top-level. MCP is mounted at
 `/mcp/` and supports standard initialization, tool discovery, and calls. Tools
 return JSON content; authorization or validation failures set MCP `isError`.
-This foundation uses stateless JSON responses. Streaming message delivery is
-implemented with Comms in its subsequent stage.
+MCP uses stateless JSON responses. Comms exposes a separate authenticated HTTP
+stream with durable replay; see its [interface reference](comms.md).
 
 Directory results contain `participants` and `next_offset`. Each participant
 includes its ID, name, kind, operator reference, membership role, and active
@@ -135,7 +139,8 @@ authenticated requests. No cookie or loopback authentication bypass is present.
 ## Host integration
 
 An existing Django application includes `teamcomms.service.apps.ServiceConfig`
-and `teamcomms.entries.apps.EntriesConfig` in `INSTALLED_APPS` and applies their
+and `teamcomms.entries.apps.EntriesConfig`, plus
+`teamcomms.comms.apps.CommsConfig`, in `INSTALLED_APPS` and applies their
 migrations to the team's authoritative database. Host settings supply the PostgreSQL connection and explicit
 `ALLOWED_HOSTS`. `teamcomms.service.asgi.create_app()` respects an already
 initialized Django application and returns the HTTP/MCP ASGI application.

@@ -7,7 +7,9 @@ The [design document](docs/design.md) describes the components, distributed arch
 The central service provides PostgreSQL migrations, team and participant
 identity, scoped credentials, and authenticated HTTP and MCP operations.
 [Entries](docs/entries.md) provides notes and documents with revision history,
-relationships, and search. The remaining component packages are scaffolds.
+relationships, and search. [Comms](docs/comms.md) provides the session directory,
+routing, durable messages, delivery receipts, and HTTP streaming/replay.
+The remaining component packages are scaffolds.
 
 ## Repository structure
 

@@ -30,3 +30,10 @@ reads, concurrent and stale updates, revision attribution, pinned references,
 restoration, database immutability, search, and scope enforcement. The temporary
 cluster uses UTF-8 encoding. Standalone verification also provisions a scoped
 credential and creates an entry through MCP for retrieval through HTTP.
+
+`comms/test_comms.py` checks session ownership, resource identity, routing
+snapshots, publication retry races, independent receipts, dispatch conflicts,
+commit-ordered cursors, immutable evidence, and access bounds.
+`check_comms_stream.py` exercises two standalone service processes sharing the
+temporary database: cross-process wake-up, pre-connection recovery, cursor replay,
+and revocation while a stream is open.

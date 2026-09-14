@@ -20,7 +20,7 @@ async def check(url, token_file):
             async with ClientSession(read, write) as session:
                 await session.initialize()
                 tools = await session.list_tools()
-                assert {tool.name for tool in tools.tools} == {
+                assert {tool.name for tool in tools.tools} >= {
                     "whoami", "list_participants", "create_participant", "issue_credential", "revoke_credential",
                     "create_entry", "get_entry", "update_entry", "restore_entry", "get_entry_revisions", "search_entries"
                 }

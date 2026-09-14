@@ -68,6 +68,8 @@ def main():
                         raise RuntimeError("Service startup timed out")
                     subprocess.run([sys.executable, "tests/check_server.py", url, str(root / "entries-token")],
                                    env=env, check=True)
+                    subprocess.run([sys.executable, "tests/check_comms_stream.py", url, str(root / "owner-token")],
+                                   env=env, check=True)
                 finally:
                     server.terminate()
                     try:
