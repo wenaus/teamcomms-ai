@@ -73,4 +73,4 @@ Agents must obtain explicit approval before running this suite; see
 
 The [example directory](examples/readme.md) describes the planned integrations.
 
-Licensed under [Apache 2.0](LICENSE).
+Copyright 2026 Torre Wenaus. Licensed under [Apache 2.0](LICENSE).
