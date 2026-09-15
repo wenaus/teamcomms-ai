@@ -1,6 +1,10 @@
 # Browser interface
 
-The authenticated TeamComms root opens Entries. Shared navigation also exposes
+The authenticated TeamComms root introduces **Notify LLM** above Entries, with
+the script command, required JSON fields, a session-directory link, retry guidance
+and links to the complete documentation and runnable Python example. The guide
+is rendered with the page; opening it does not send notifications. Direct component
+pages retain their existing layouts. Shared navigation also exposes
 the canonical [Pouch](pouch.md), structured [Inflight](inflight.md) work and
 read-only session and Dialog views. All pages,
 assets, reads and writes use the installation's existing authentication boundary

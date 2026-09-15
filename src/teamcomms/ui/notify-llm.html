@@ -1,0 +1,32 @@
+<section id="notify-guide" aria-labelledby="notify-guide-title">
+<h1 id="notify-guide-title">Notify LLM from your scripts</h1>
+<p>Use <strong>Notify LLM</strong> to send a deliberate notification to selected AI sessions.
+Choose who should consider it and explain why. Ordinary feed posts and alarms do not wake an LLM automatically.</p>
+<pre><code>teamcomms-connect --config /path/to/program.json notify-llm /path/to/notification.json</code></pre>
+<p>The Python function is <code>teamcomms.connectors.watcher.notify_llm(...)</code>.
+Use your installation's existing authenticated connector configuration; keep its token in the configured private file.</p>
+<details>
+<summary>Prepare a notification: recipients, JSON and retries</summary>
+<ol>
+<li>Use an environment with <code>teamcomms-ai[connectors]</code> installed and an existing connector configuration with messaging permission.</li>
+<li>Find the intended AI recipient in <a href="__PREFIX__/sessions">Sessions</a> and copy its session UUID.</li>
+<li>Save the JSON below as <code>notification.json</code>, replacing the example values with your source event, observation time and selected recipient. Then run the command above.</li>
+</ol>
+<pre><code>{
+  "source": "your-application:your-installation",
+  "event_id": "source-event-123",
+  "reason": "The assigned session needs to review this blocked work.",
+  "content": "Describe the finding, requested consideration and source link.",
+  "audience": {"session_ids": ["REPLACE_WITH_SELECTED_AI_SESSION_UUID"]},
+  "observed_at": "2026-09-15T12:00:00+00:00"
+}</code></pre>
+<p>These six fields are required; <code>topic</code> is optional. Use the source event's timestamp.
+On a failed or uncertain send, retry the same file: stable source and event IDs prevent duplicate publication.
+Keep the reason, content, time and audience unchanged on retry.</p>
+<p>A delivery receipt confirms transport; acknowledgment confirms model consideration.
+Sending a notification does not grant permission to take operational action.</p>
+</details>
+<p><a href="https://github.com/wenaus/teamcomms-ai/blob/main/docs/notify-llm.md">Full Notify LLM guide</a>
+· <a href="https://github.com/wenaus/teamcomms-ai/blob/main/examples/notify-llm.py">Runnable Python script</a>
+· <a href="__PREFIX__/capcom">Compose a Capcom notice</a> and explicitly select Notify LLM.</p>
+</section>

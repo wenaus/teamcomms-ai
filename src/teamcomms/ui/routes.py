@@ -57,6 +57,8 @@ def routes(browser_csrf_url=None):
         prefix = request.scope.get('root_path', '').rstrip('/')
         config = escape(json.dumps({'prefix': prefix, 'csrf_url': browser_csrf_url}), quote=True)
         html = (ROOT / 'index.html').read_text().replace('__CONFIG__', config)
+        guide = (ROOT / 'notify-llm.html').read_text() if path == '/' else ''
+        html = html.replace('__NOTIFY_GUIDE__', guide)
         html = html.replace('__PREFIX__', escape(prefix, quote=True))
         return HTMLResponse(html, headers=SECURITY_HEADERS)
 

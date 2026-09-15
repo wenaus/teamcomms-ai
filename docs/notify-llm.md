@@ -4,6 +4,9 @@
 notification category: use it when a named recipient needs to consider something,
 with a reason explaining why. It is off by default and independent of severity.
 An alarm, ordinary completion notice or live-feed post does not select it.
+The TeamComms home page introduces this command with an expandable JSON example,
+recipient-directory link and runnable Python example. In SWF, open **System →
+TeamComms** to find it.
 
 ## Script function
 
