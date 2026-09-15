@@ -29,6 +29,9 @@ and optional headless fallback.
 
 [Embedded operation](docs/embedded.md) integrates TC with a host application's
 existing accounts, tokens, database, URL namespace, and deployment.
+[Installation and recovery](docs/operations.md) assembles deployment, backup,
+restore, upgrade, rollback and removal procedures. [Staged adoption](docs/adoption.md)
+records the SWF pilot, measured delivery, recovery evidence and remaining limits.
 
 ## Repository structure
 

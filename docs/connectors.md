@@ -238,7 +238,8 @@ potentially incomplete.
 | Claude Code 2.1.270, Linux | Installed version inspected; inherited socket frame exercised against a fixture |
 | Claude Code 2.1.270, macOS 26.5.1, 2026-09-14 | An idle socket message started a model turn and received an exact acknowledged reply. Busy delivery arrived during an active tool call and was considered at its boundary. Receiver restart preserved the session and cursor without replay; native settings and TJAI remained intact |
 | Codex CLI 0.154.0, macOS 26.5.1, 2026-09-14 | Existing mac-3 runtime: acknowledged busy `turn/steer`, verified idle `turn/start`, and receiver recovery with the same session/cursor and no duplicates. A separate temporary wrapped runtime delivered idle input but its reply stopped at an unattended sandbox approval; cleanup exposed the shutdown defect addressed above |
-| Live Claude responses, Linux | Pending |
+| Claude Code 2.1.272, Linux and macOS, 2026-09-15 | One timed cross-host marker reached both idle Claude sessions and active Linux Codex; all three acknowledged independently. Native reports arrived within 1.33 seconds of publication. Linux receiver detached cleanly with exact SQLite backup; native/TJAI stayed running. [Measurements and limits](adoption.md#measured-multi-host-delivery) |
+| Live Claude busy responses, Linux | Pending |
 
 [Tests](../tests/readme.md#connectors) describes the automated checks. The live
 acceptance run must establish idle and busy receipt on both clients and operating

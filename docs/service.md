@@ -89,6 +89,10 @@ identity or team through request fields.
 | `comms:write` | Publish messages and report own destination receipts |
 | `dialog:read` | Read shared team transcript history and bootstrap context |
 | `dialog:write` | Record transcript events for own sessions |
+| `inflight:read` | Read work, ownership, offers, claims and execution results |
+| `inflight:write` | Create work and perform authorized lifecycle/claim/execution changes |
+| `capcom:read` | Read topics, notices and owned-session attention policy |
+| `capcom:write` | Publish authorized topic changes, notices and owned-session attention policy |
 
 Every authenticated member can inspect its own identity. Provisioned participants
 start as members and can receive directory-read, Entries, session, and Comms credentials. The
@@ -171,6 +175,10 @@ and the [MCP SDK 1.x reference](https://github.com/modelcontextprotocol/python-s
 for the framework contracts.
 
 ## Verification
+
+The [operating guide](operations.md) covers independent installation,
+backup/restore, upgrades, rollback and removal. The [adoption record](adoption.md)
+distinguishes isolated recovery evidence from live host commissioning.
 
 [The isolated service suite](../tests/readme.md) provisions a temporary
 PostgreSQL cluster, applies migrations, checks bootstrap and installed startup,
