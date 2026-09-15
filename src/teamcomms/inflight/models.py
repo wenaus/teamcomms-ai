@@ -104,3 +104,13 @@ class GuardRun(models.Model):
 
     class Meta:
         constraints = [models.UniqueConstraint(fields=["claim"], condition=Q(state="active"), name="tc_guard_one_active")]
+
+
+class ExecutionRun(models.Model):
+    id = models.UUIDField(primary_key=True,editable=False)
+    claim = models.OneToOneField(Claim,on_delete=models.PROTECT,related_name='execution_run')
+    command_sha256 = models.CharField(max_length=64)
+    specification = models.JSONField()
+    state = models.CharField(max_length=12,default='active')
+    result = models.JSONField(null=True)
+    created_at = models.DateTimeField(auto_now_add=True)

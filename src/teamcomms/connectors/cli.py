@@ -38,7 +38,8 @@ INFLIGHT_CALLS.update({"manage_work_resource": ("POST", "/resources/manage"),
     "list_work_resources": ("GET", "/resources"), "offer_work": ("POST", "/offers"),
     "claim_work": ("POST", "/claims"), "update_claim": ("POST", "/claims/update"),
     "get_claim": ("GET", "/claims/read"), "validate_claim": ("POST", "/claims/validate"),
-    "record_guard_run": ("POST", "/claims/guard")})
+    "record_guard_run": ("POST", "/claims/guard"),
+    "list_work_offers": ("GET", "/offers/available"), "record_execution": ("POST", "/executions")})
 CAPCOM_CALLS = {"create_topic": ("POST", "/topics"), "list_topics": ("GET", "/topics"),
     "update_topic": ("POST", "/topics/update"), "get_topic": ("GET", "/topics/read"),
     "publish_notice": ("POST", "/notices"), "get_topic_notices": ("GET", "/notices"),
@@ -210,6 +211,12 @@ def main():
     recv.add_argument("--transcript", default="")
     recv.add_argument("--cwd", default=os.getcwd())
     recv.add_argument("--once", action="store_true")
+    worker = commands.add_parser("worker", help="Execute only explicitly eligible offers using local wrangle profiles")
+    worker.add_argument("--worker-config",required=True)
+    worker.add_argument("--offer-id")
+    worker.add_argument("--once",action="store_true")
+    worker.add_argument("--mode",choices=["interactive","headless"],default="headless")
+    worker.add_argument("--session-id")
     guard = commands.add_parser("guard", help="Run one foreground command under an existing fenced resource claim")
     guard.add_argument("--guard-config", required=True)
     guard.add_argument("--claim-id", required=True)
@@ -247,6 +254,9 @@ def main():
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
     try:
         config = load(args.config)
+        if args.command == "worker":
+            from .execution import run_worker
+            return run_worker(args,config)
         if args.command == "guard":
             from .guard import run_guard
             return asyncio.run(run_guard(args, config))

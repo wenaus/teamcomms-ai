@@ -284,3 +284,13 @@ or marking the message considered. Batch and quiet policies defer new routine
 dispatches; original receipts and persisted uncertain dispatch reconciliation
 remain authoritative. Human messages, alarms and ordinary Comms bypass this
 filter. Existing receiver reconnects revisit due work without model polling.
+
+## wrangle-ai workers
+
+The optional `execution` extra installs the pinned wrangle-ai core. Its
+[execution adapter](execution.md) uses the existing connector URL and token plus
+a private worker profile file. Copy the [worker example](../examples/execution/worker.json)
+outside the checkout, set absolute executable/workspace paths and mode 0600,
+and enable only explicitly reviewed commands. Headless workers have their own
+Comms directory session; they neither consume notifications as tasks nor attach
+to interactive native runtimes.

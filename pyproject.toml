@@ -23,6 +23,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+execution = ["httpx>=0.28,<1", "wrangle-ai @ git+https://github.com/BNLNPPS/wrangle-ai.git@55d4def263187a9cab5d07b2f6a706dd9a4cd357"]
 connectors = ["httpx>=0.28,<1", "websockets>=15,<16"]
 test = ["pytest>=8,<10", "pytest-django>=4.9,<5", "httpx>=0.28,<1", "websockets>=15,<16"]
 

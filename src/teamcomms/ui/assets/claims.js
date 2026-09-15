@@ -21,6 +21,9 @@ class TeamCommsClaims {
     info.textContent=current?`${current.holder_name} · ${current.state} · lease until ${new Date(current.deadline).toLocaleString()}. ${current.resources.length} resources retained. ${current.guard_run_ids.length?'A guarded command is active or awaiting reconciliation.':''}`:
       offer?`Offer open until ${new Date(offer.expires_at).toLocaleString()} · ${offer.policy} · ${offer.resource_ids.length} resources.`:'No active execution claim. The accountable owner is retained.';
     box.append(info);
+    const execution=entry.current_execution,spec=current?.execution||offer?.execution||execution?.specification;
+    if(spec){const p=document.createElement('p');p.textContent=`Worker profile ${spec.profile} · ${spec.permissions} · timeout ${spec.timeout_seconds}s · ${spec.model||'deterministic command'}${spec.effort?' · effort '+spec.effort:''} · budget USD ${spec.budget_usd}. ${spec.headless_after?'Headless eligible after '+new Date(spec.headless_after).toLocaleString(): 'Interactive execution only.'}`;box.append(p);}
+    if(execution){const p=document.createElement('p');p.textContent=`Execution ${execution.state} · run ${execution.run_id}${execution.result?' · '+(execution.result.outcome||execution.result.reason):' · stop not yet confirmed'}`;box.append(p);}
     const canWrite=w.identity.scopes.includes('inflight:write'),manager=canWrite&&(w.identity.role==='admin'||entry.work.owner_id===w.identity.participant_id);
     const button=(label,handler)=>{const b=document.createElement('button');b.textContent=label;b.disabled=this.running;b.onclick=handler;box.append(b);return b;};
     const textarea=(label)=>{const l=document.createElement('label');l.textContent=label;const t=document.createElement('textarea');t.maxLength=4000;t.rows=2;l.append(t);box.append(l);return t;};

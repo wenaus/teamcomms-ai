@@ -23,7 +23,9 @@ accepted handoffs, Live/Done state and completion evidence. [Claims](docs/claims
 add atomic resource reservations, persistent custodians and cooperating command
 guards. [Capcom](docs/capcom.md) brings current work, retained events, decisions
 and authorized conversation into topical views, with explicit read markers and
-opt-in routine attention controls.
+opt-in routine attention controls. [Execution](docs/execution.md) connects
+wrangle-ai workers to explicit offers, renewable claims, bounded local profiles
+and optional headless fallback.
 
 [Embedded operation](docs/embedded.md) integrates TC with a host application's
 existing accounts, tokens, database, URL namespace, and deployment.

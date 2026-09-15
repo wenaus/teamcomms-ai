@@ -1,0 +1,13 @@
+{
+  "worker_id": "package-inspector",
+  "capabilities": ["inspect-package"],
+  "max_workers": 1,
+  "profiles": {
+    "inspect-package": {
+      "workspace": "/absolute/path/to/teamcomms-ai",
+      "command": ["/absolute/path/to/python", "/absolute/path/to/teamcomms-ai/examples/execution/inspect_package.py"],
+      "permissions": "read_only",
+      "timeout_seconds": 30
+    }
+  }
+}

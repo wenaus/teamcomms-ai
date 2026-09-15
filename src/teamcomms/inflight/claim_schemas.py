@@ -22,6 +22,22 @@ class ManageResource(Request):
     reason: str = Field(default="", max_length=4000)
 
 
+class ExecutionSpec(Request):
+    profile: str = Field(min_length=1,max_length=80,pattern=r'^[a-zA-Z0-9._-]+$')
+    timeout_seconds: int = Field(default=300,ge=1,le=3600)
+    permissions: Literal['read_only','workspace_write']='read_only'
+    model: str = Field(default='',max_length=120)
+    effort: str = Field(default='',max_length=40)
+    budget_usd: float = Field(default=0,ge=0,le=100,allow_inf_nan=False)
+    headless_after: datetime | None = None
+
+    @model_validator(mode='after')
+    def aware(self):
+        if self.headless_after is not None and self.headless_after.utcoffset() is None:
+            raise ValueError('Headless deadline requires timezone')
+        return self
+
+
 class OfferWork(Request):
     operation_id: UUID
     operation: Literal["offer"] = "offer"
@@ -34,6 +50,7 @@ class OfferWork(Request):
     expires_at: datetime
     lease_seconds: int = Field(default=300, ge=30, le=3600)
     policy: Literal["advisory", "guarded"] = "advisory"
+    execution: ExecutionSpec | None = None
 
     @model_validator(mode="after")
     def bounds(self):
@@ -54,6 +71,7 @@ class ClaimWork(Request):
     expected_revision: int = Field(ge=1)
     expected_generation: int = Field(ge=1)
     session_id: UUID | None = None
+    mode: Literal["interactive","headless"] = "interactive"
 
 
 class UpdateClaim(Request):
@@ -101,3 +119,24 @@ class GuardRunRequest(Request):
     command_sha256: str = Field(default="", pattern=r"^([a-f0-9]{64})?$")
     exit_code: int | None = None
     stopped: bool = False
+
+
+class AvailableOffers(Page):
+    session_id: UUID
+    mode: Literal['interactive','headless']='headless'
+    profile: str | None = Field(default=None,min_length=1,max_length=80)
+    offer_id: UUID | None = None
+
+
+class ExecutionRequest(Request):
+    operation_id: UUID
+    operation: Literal['execution']='execution'
+    claim_id: UUID
+    expected_generation: int = Field(ge=1)
+    run_id: UUID
+    action: Literal['start','finish']
+    command_sha256: str = Field(default='',pattern=r'^([a-f0-9]{64})?$')
+    stopped: bool = False
+    exit_code: int | None = None
+    outcome: str = Field(default='',max_length=4000)
+    evidence: Evidence = Field(default_factory=list)

@@ -116,3 +116,13 @@ Offers capture resource generations as well as work generation. A resource
 change after the offer requires a fresh offer, so delayed offers cannot acquire
 changed resources silently. Exact retry receipts describe their original result;
 they are never a substitute for fresh validation before an external mutation.
+
+## Execution workers
+
+[The wrangle-ai adapter](execution.md) extends offers with optional execution
+profiles and headless eligibility time. Absent execution fields preserve existing
+interactive claims and exact retry receipts. An execution admission, including
+an unconfirmed admission after a crash, blocks ordinary claim release/completion.
+Confirmed successful results must match completion outcome/evidence. Explicit
+owner stopped-work reconciliation closes unresolved execution records as well as
+guard runs; lease expiry alone still releases nothing.

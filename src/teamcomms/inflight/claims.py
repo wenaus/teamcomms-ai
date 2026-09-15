@@ -17,6 +17,9 @@ def begin(actor, request):
         raise AccessError('Team not found',404)
     member(actor,actor.participant_id)
     payload=request.model_dump(mode='json')
+    # Retain exact equality with pre-execution coordination receipts.
+    if payload.get('operation')=='offer' and payload.get('execution') is None:payload.pop('execution',None)
+    if payload.get('operation')=='claim' and payload.get('mode')=='interactive':payload.pop('mode',None)
     receipt=CoordinationReceipt.objects.filter(pk=request.operation_id).first()
     if receipt:
         if receipt.team_id!=actor.team_id or receipt.author_id!=actor.participant_id or receipt.request!=payload:
@@ -119,10 +122,18 @@ def offer_work(actor,request):
         if request.policy=='guarded' and resource.protection!='local_flock':raise AccessError('Guarded offer contains an advisory resource',400)
     work.offers.filter(state='open').update(state='canceled')
     spec={key:payload[key] for key in ('eligible_participant_ids','resource_ids','required_capabilities','lease_seconds','policy')}
+    if request.execution:
+        if request.execution.headless_after and request.execution.headless_after>=request.expires_at:
+            raise AccessError('Fallback deadline must precede offer expiry',400)
+        if request.execution.permissions=='workspace_write' and request.policy!='guarded':
+            raise AccessError('Mutation execution requires guarded resources',400)
+        spec['execution']=request.execution.model_dump(mode='json')
     spec['resource_generations']=resource_generations
     offer=WorkOffer.objects.create(id=uuid4(),work=work,generation=work.generation,specification=spec,expires_at=request.expires_at)
     work.detail['execution_offer']={'offer_id':str(offer.id),**spec,'expires_at':offer.expires_at.isoformat()}
     value=snapshot(actor,work,'offer_work')
+    from .execution import ring_offers
+    ring_offers(request.eligible_participant_ids)
     return finish(actor,request,payload,{**value,'offer':work.detail['execution_offer']})
 
 
@@ -135,12 +146,15 @@ def claim_for(actor,claim_id):
 def claim_record(row):
     resources=[{**resource_record(r.resource),'reservation_generation':r.generation,'active':r.active}
         for r in row.reservations.select_related('resource__resource','resource__custodian').order_by('resource_id')]
-    return {'claim_id':str(row.id),'offer_id':str(row.offer_id),'entry_id':str(row.work_id),
+    from .execution import execution_record
+    run=getattr(row,'execution_run',None)
+    return {'execution_run':execution_record(run) if run else None,'claim_id':str(row.id),'offer_id':str(row.offer_id),'entry_id':str(row.work_id),
         'holder_id':str(row.holder_id),'holder_name':row.holder.name,
         'session_id':str(row.session_id) if row.session_id else None,'generation':row.generation,
         'state':'expired_held' if row.state=='active' and row.deadline<=timezone.now() else row.state,
         'deadline':row.deadline.isoformat(),'server_time':timezone.now().isoformat(),
         'lease_seconds':row.offer.specification['lease_seconds'],'policy':row.offer.specification['policy'],
+        'execution':row.offer.specification.get('execution'),
         'guard_run_ids':[str(x) for x in row.guard_runs.filter(state='active').values_list('pk',flat=True)],
         'resources':resources,'work_revision':row.work.entry.revision,'owner_id':str(row.work.owner_id)}
 
@@ -161,6 +175,9 @@ def claim_work(actor,request):
         session=Session.objects.filter(pk=request.session_id,membership__team_id=actor.team_id,
             membership__participant_id=actor.participant_id,membership__active=True).first()
         if session is None:raise AccessError('Claim session does not belong to caller',404)
+    from .execution import eligible_mode
+    eligible_mode(offer,request.mode)
+    if request.mode=='headless' and session is None:raise AccessError('Headless claims require an owned worker session',400)
     needed=set(offer.specification['required_capabilities'])
     if needed and (not session or not needed<=set(session.capabilities)):raise AccessError('Claim session lacks required reported capabilities')
     resources=[resource_for(actor,key) for key in sorted(offer.specification['resource_ids'])]
@@ -199,6 +216,15 @@ def update_claim(actor,request):
     stop=request.action=='confirm_stopped'
     if stop:coordinator(actor,work)
     validate(row,actor,request.expected_generation,live=request.action in {'renew','progress','complete'},holder=not stop)
+    from .models import ExecutionRun
+    execution=ExecutionRun.objects.filter(claim=row).first()
+    if request.action in {'release','complete'} and execution and execution.state=='active':
+        raise AccessError('Execution is active or its stop is unconfirmed',409)
+    if request.action=='complete' and row.offer.specification.get('execution'):
+        if not execution or execution.state!='finished' or execution.result['exit_code']!=0:
+            raise AccessError('A successful stopped execution result is required',409)
+        if request.outcome!=execution.result['outcome'] or request.evidence!=execution.result['evidence']:
+            raise AccessError('Completion must match the recorded execution result',409)
     if request.action!='renew':_expected(work.entry,request.expected_revision)
     if request.action in {'release','complete'} and row.guard_runs.filter(state='active').exists():
         raise AccessError('A guarded command is still active or unconfirmed; stop and reconcile it first',409)
@@ -221,6 +247,8 @@ def update_claim(actor,request):
             work.detail['stop_evidence']=request.evidence
             work.executor_id=work.session_id=None;work.generation+=1
             row.state='stopped' if stop else 'released'
+            if stop and execution and execution.state=='active':
+                execution.state='reconciled';execution.result={'reason':request.reason,'evidence':request.evidence};execution.save(update_fields=['state','result'])
             if stop:row.guard_runs.filter(state='active').update(state='reconciled',outcome={'reason':request.reason,'evidence':request.evidence})
         row.save(update_fields=['state']);row.reservations.update(active=False)
     saved=snapshot(actor,work,'claim_'+request.action)

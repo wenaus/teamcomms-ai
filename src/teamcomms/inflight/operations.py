@@ -317,6 +317,10 @@ def get_work(actor, request):
     from .claims import claim_record
     current_claim = work.claims.filter(state="active").select_related("offer", "work__entry", "holder").first()
     value["current_claim"] = claim_record(current_claim) if current_claim else None
+    from .models import ExecutionRun
+    from .execution import execution_record
+    latest_run=ExecutionRun.objects.filter(claim__work=work).order_by('-created_at').first()
+    value['current_execution']=execution_record(latest_run) if latest_run else None
     offer = work.offers.filter(state="open", generation=work.generation).first()
     value["current_offer"] = {"offer_id":str(offer.id), **offer.specification,
                               "expires_at":offer.expires_at.isoformat()} if offer else None
