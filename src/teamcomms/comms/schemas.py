@@ -129,12 +129,27 @@ class SendMessage(Request):
     observed_at: datetime | None = None
     references: list[Reference] = Field(default_factory=list, max_length=30)
     external_source: ExternalSource | None = None
+    notify_llm: bool = False
+    notify_llm_reason: str = Field(default="", max_length=1000)
+    notify_llm_source: str = Field(default="", max_length=2048)
+    notify_llm_event_id: str = Field(default="", max_length=240)
 
     @model_validator(mode="after")
     def aware(self):
         if self.observed_at is not None and self.observed_at.utcoffset() is None:
             raise ValueError("Observation time requires a timezone")
+        intent = (self.notify_llm_reason, self.notify_llm_source, self.notify_llm_event_id)
+        if self.notify_llm:
+            if self.kind != "notification" or not all(v.strip() for v in intent) or self.observed_at is None:
+                raise ValueError("Notify LLM requires a notification, reason, source, event ID and observation time")
+        elif any(intent):
+            raise ValueError("Notify LLM attribution requires explicit notify_llm=true")
         return self
+
+
+class NotifyLLM(SendMessage):
+    kind: Literal["notification"] = "notification"
+    notify_llm: Literal[True] = True
 
 
 class Inbox(Request):

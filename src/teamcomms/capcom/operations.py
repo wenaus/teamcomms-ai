@@ -10,8 +10,8 @@ from teamcomms.entries.models import Revision
 from teamcomms.entries.operations import reference_entry,read_entry
 from teamcomms.entries.schemas import ReadEntry
 from teamcomms.comms.models import Message,Delivery
-from teamcomms.comms.operations import send_message,get_message,delivery_record
-from teamcomms.comms.schemas import SendMessage,Subscribe,MessageQuery
+from teamcomms.comms.operations import send_message,get_message,delivery_record,notify_llm
+from teamcomms.comms.schemas import SendMessage,Subscribe,MessageQuery,NotifyLLM
 from teamcomms.comms.directory import subscribe,own_session
 from teamcomms.dialog.operations import visible_events,event_record
 from .models import Topic,TopicRevision,TopicReference,Notice,Decision,Follow,MutationReceipt,Presentation,ConversationRead
@@ -22,6 +22,8 @@ def begin(actor,request):
     Team.objects.select_for_update().get(pk=actor.team_id)
     if not Membership.objects.filter(pk=actor.membership_id,active=True).exists():raise AccessError('Inactive membership')
     payload=request.model_dump(mode='json')
+    if payload.get('operation') == 'publish_notice' and not payload.get('notify_llm'):
+        payload.pop('notify_llm',None);payload.pop('notify_llm_reason',None)
     old=MutationReceipt.objects.filter(pk=request.operation_id).first()
     if old:
         if old.team_id!=actor.team_id or old.author_id!=actor.participant_id or old.request!=payload:raise AccessError('Operation UUID already used differently',409)
@@ -143,6 +145,8 @@ def notice_record(row,actor):
         'content':row.content,'source':row.source,'observed_at':row.observed_at.isoformat(),'created_at':row.created_at.isoformat(),
         'decision':{'revision':decision.revision,'resolution':decision.resolution,'resolved_by':str(decision.resolved_by_id) if decision.resolved_by_id else None,
             'resolved_at':decision.resolved_at.isoformat() if decision.resolved_at else None} if decision else None,'deliveries':[]}
+    envelope=row.published_message.envelope if row.published_message_id else {}
+    result.update(notify_llm=envelope.get('notify_llm',False),notify_llm_reason=envelope.get('notify_llm_reason',''))
     if row.published_message_id and 'comms:read' in actor.scopes:
         deliveries=Delivery.objects.filter(message_id=row.published_message_id)
         if row.author_id!=actor.participant_id:deliveries=deliveries.filter(session__membership__participant_id=actor.participant_id)
@@ -159,7 +163,7 @@ def presentation_record(row):
 
 def get_topic_notices(actor,query):
     row=topic_for(actor,query.topic_id)
-    notices=Notice.objects.filter(topic=row).select_related('author').order_by('-sequence')
+    notices=Notice.objects.filter(topic=row).select_related('author','published_message').order_by('-sequence')
     if query.before is not None:notices=notices.filter(sequence__lt=query.before)
     page=list(notices[:query.limit+1]);selected=page[:query.limit]
     return {'notices':[notice_record(n,actor) for n in selected],'next_before':selected[-1].sequence if len(page)>query.limit else None,
@@ -174,8 +178,11 @@ def publish_notice(actor,request):
     if Notice.objects.filter(pk=request.notice_id).exists():raise AccessError('Notice ID already exists; retry its exact operation UUID',409)
     publication=None
     if request.audience:
-        publication=send_message(actor,SendMessage(message_id=request.notice_id,sender_session_id=request.sender_session_id,audience=request.audience,
-            topic=topic.key,kind='notification',content=f'[{request.urgency} · {topic.title}] {request.content}\nCapcom topic: /capcom/{topic.id}',observed_at=request.observed_at))
+        schema,operation=(NotifyLLM,notify_llm) if request.notify_llm else (SendMessage,send_message)
+        intent={'notify_llm_reason':request.notify_llm_reason,'notify_llm_source':f'capcom:{topic.id}',
+                'notify_llm_event_id':str(request.notice_id)} if request.notify_llm else {}
+        publication=operation(actor,schema(message_id=request.notice_id,sender_session_id=request.sender_session_id,audience=request.audience,
+            topic=topic.key,kind='notification',content=f'[{request.urgency} · {topic.title}] {request.content}\nCapcom topic: /capcom/{topic.id}',observed_at=request.observed_at,**intent))
     topic.last_sequence+=1;topic.save(update_fields=['last_sequence','updated_at'])
     notice=Notice.objects.create(id=request.notice_id,topic=topic,sequence=topic.last_sequence,author_id=actor.participant_id,kind=request.kind,urgency=request.urgency,
         content=request.content,source=request.source,observed_at=request.observed_at,published_message_id=request.notice_id if publication else None)

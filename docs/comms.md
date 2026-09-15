@@ -72,6 +72,11 @@ and envelope return the existing publication. A changed envelope or author
 conflicts. Audience changes after publication leave its destination list intact.
 An upstream watcher retains and retries its original UUID until it has the result.
 
+AI notification destinations require explicit [Notify LLM](notify-llm.md) intent.
+Ordinary notifications and externally sourced messages exclude AI sessions;
+direct peer conversations retain existing routing. Severity never selects model
+attention. Empty eligible audiences fail visibly without creating a message.
+
 The envelope includes kind (`notification`, `conversation`, or `offer`), content,
 topic, optional timezone-aware observation time, reply reference, reply-requested
 flag, and entry/version references. The service adds schema version, author

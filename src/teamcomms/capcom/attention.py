@@ -39,7 +39,7 @@ def set_attention_policy(actor,request):
 
 def routine(row):
     notice=getattr(row.message,'capcom_notice',None)
-    return bool(notice and notice.kind=='routine' and notice.urgency=='routine'
+    return bool(notice and not row.message.envelope.get('notify_llm') and notice.kind=='routine' and notice.urgency=='routine'
         and row.message.author_snapshot.get('kind')!='human' and not row.message.envelope.get('external_source')
         and row.message.envelope.get('kind')=='notification' and not row.message.envelope.get('reply_requested'))
 

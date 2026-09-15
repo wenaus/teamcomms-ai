@@ -38,8 +38,13 @@ retains previously linked fixed Entry versions through protected foreign keys.
 An optional notice audience publishes a canonical Comms notification in the same
 transaction, reusing the notice UUID. Empty eligible audiences fail visibly.
 Destinations remain fixed and independent; alarms are never merged or discarded.
-A notice without an audience is recorded only in Capcom. Existing watcher and
-Mattermost routes are unaffected. Topic conversations read existing authorized
+A notice without an audience is recorded only in Capcom. AI destinations require
+**Notify LLM**, an explicit audience and a reason; urgency, including alarm, never
+selects it automatically. The browser checkbox starts off and reveals a recipient
+selector when enabled. The API fields are `notify_llm` and `notify_llm_reason`;
+source identity is the topic and notice UUID. See [Notify LLM](notify-llm.md).
+
+Topic conversations read existing authorized
 Comms rows; they are not copied or republished. Dialog references expose source
 identity, role and capture gaps within a bounded excerpt.
 
@@ -51,7 +56,9 @@ session: `routine_mode=immediate|record|batch`, `batch_seconds` (5–300), and o
 `quiet_until` (at most 24 hours). They apply only to machine-authored, routine
 Capcom notifications without a requested reply. Human-authored messages, external
 human instructions, alarms, urgent notices, conversations and work offers bypass
-routine policy. Ordinary Comms messages retain their current delivery behavior.
+routine policy once admitted. **Notify LLM** also bypasses routine policy.
+This presentation policy never admits an unselected notification to an AI inbox;
+the publication gate applies first. Direct peer conversations retain their behavior.
 
 Record mode keeps the canonical notice and each destination record without a
 model call. Batch mode waits for the fixed time window, then presents the newest

@@ -2,7 +2,8 @@
 
 The Mattermost connector maps each explicitly configured channel to a durable
 Comms session. Topic subscriptions deliver the same canonical event independently
-to that channel and subscribed AI sessions. Each route maintains its own cursor,
+to that channel. AI destinations require an explicit **Notify LLM** selection.
+Each route maintains its own cursor,
 outbox, post mappings, and delivery receipts in private local state.
 
 The connector uses existing TeamComms host authentication and a Mattermost bot
@@ -19,6 +20,10 @@ bridge obtains these fields from authenticated Mattermost post/user reads.
 Ordinary messages cannot replace their authenticated TC author.
 
 Each channel has explicit inbound audience and outbound topic subscriptions.
+Inbound publication requires **Notify LLM**: either the exact leading text
+`Notify LLM:` or post property `notify_llm: true`. Ordinary posts advance the
+bridge cursor without TC publication or model calls. The selection is independent
+of severity. See [Notify LLM](notify-llm.md) for the script function and bounds.
 Replies to a bridged TC message use the channel session as destination. Stored
 post mappings translate TC reply references to Mattermost `root_id`, preserving
 the original thread. Unmapped external roots remain explicit provenance without
@@ -50,8 +55,10 @@ and [user identity](https://docs.mattermost.com/api/reference/get-user).
 
 ## Watcher publication
 
-Watchers publish notifications with an explicit audience and a stable source
-event identifier. The publisher derives one message UUID from source and event
+Ordinary watcher notifications exclude AI destinations, even when a subscribed
+topic includes them. Use [Notify LLM](notify-llm.md) to request model attention
+deliberately. Watchers publish notifications with an explicit audience and a
+stable source event identifier. The publisher derives one message UUID from source and event
 ID and persists the complete request before sending. Retries reuse that request;
 changing an existing event's payload is a conflict. An observation timestamp
 comes from the source event rather than the time of a retry. Production state

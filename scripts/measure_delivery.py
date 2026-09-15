@@ -63,7 +63,10 @@ async def main():
     if not request_path.exists():
         if args.action != 'publish' or not args.session_id or not args.content_file:
             parser.error('First publication requires explicit session IDs and content file')
-        write_new(request_path, {'message_id': str(uuid4()), 'kind': 'notification',
+        identity = str(uuid4())
+        write_new(request_path, {'message_id': identity, 'kind': 'notification',
+            'notify_llm': True, 'notify_llm_reason': 'Explicit bounded delivery measurement',
+            'notify_llm_source': 'teamcomms-delivery-measurement', 'notify_llm_event_id': identity,
             'content': args.content_file.read_text(), 'observed_at': now(),
             'audience': {'session_ids': args.session_id}})
     elif args.session_id or args.content_file:

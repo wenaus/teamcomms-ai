@@ -4,7 +4,7 @@ from starlette.routing import Route
 from teamcomms.service.dispatch import invoke
 from . import directory, operations
 from .schemas import (Acknowledge, DeliveryHistory, Heartbeat, Inbox, MessageQuery, NewGroup,
-                      NewResource, Page, RegisterSession, Report, SendMessage, Sessions, Subscribe)
+                      NewResource, Page, RegisterSession, Report, SendMessage, Sessions, Subscribe, NotifyLLM)
 from .stream import stream_messages
 
 
@@ -55,6 +55,11 @@ def register(mcp, endpoint):
         return await invoke(operations.send_message, request)
 
     @mcp.tool()
+    async def notify_llm(request: NotifyLLM) -> dict:
+        """Deliberately notify selected AI sessions; requires reason, source and event identity."""
+        return await invoke(operations.notify_llm, request)
+
+    @mcp.tool()
     async def get_messages(request: Inbox) -> dict:
         """Read a bounded session inbox without acknowledging; resume using next_after."""
         return await invoke(operations.get_messages, request)
@@ -86,6 +91,7 @@ def register(mcp, endpoint):
         ("/groups", {"GET": (directory.list_groups, Page), "POST": (directory.register_group, NewGroup)}),
         ("/subscriptions", {"POST": (directory.subscribe, Subscribe)}),
         ("/messages", {"GET": (operations.get_messages, Inbox), "POST": (operations.send_message, SendMessage)}),
+        ("/notify-llm", {"POST": (operations.notify_llm, NotifyLLM)}),
         ("/messages/read", {"GET": (operations.get_message, MessageQuery)}),
         ("/messages/acknowledge", {"POST": (operations.acknowledge_message, Acknowledge)}),
         ("/deliveries", {"POST": (operations.record_delivery, Report)}),

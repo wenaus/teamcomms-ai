@@ -90,6 +90,9 @@ class MattermostAdapter:
             body = {"channel_id": self.route.channel_id, "message": message_text(message),
                     "root_id": root, "props": {"teamcomms_message_id": message_id,
                                                 "teamcomms_server": self.service.config.url}}
+            if message.get("notify_llm"):
+                body["props"].update(notify_llm=True, notify_llm_reason=message["notify_llm_reason"])
+                body["message"] = "**Notify LLM**\n" + body["message"]
             prepared = {"state": "prepared", "body": body}
             self.store.put(key, prepared)
         prepared["state"] = "sending"
@@ -186,6 +189,11 @@ class Inbound:
                 or self.store.get("mm:post:" + post["id"])):
             return
         key = "mm:inbound:" + post["id"]
+        props = post.get("props") or {}
+        selected = props.get("notify_llm") is True or post["message"].startswith("Notify LLM:")
+        if not selected:
+            # Ordinary channel traffic stays in Mattermost; it cannot wake a model.
+            return
         body = self.store.get(key)
         if body is None:
             user = await self.mm.request("GET", "/users/" + post["user_id"])
@@ -196,8 +204,11 @@ class Inbound:
                       "post_id": post["id"], "thread_id": post.get("root_id") or post["id"],
                       "user_id": user["id"], "username": user["username"],
                       "kind": "bot" if user.get("is_bot") else "human"}
-            body = SendMessage(message_id=identity, sender_session_id=self.session_id,
+            body = SendMessage(message_id=identity, sender_session_id=self.session_id, kind="notification",
                 audience=self.route.inbound_audience, content=post["message"], external_source=source,
+                notify_llm=True, notify_llm_reason=props.get("notify_llm_reason") or "Mattermost author selected Notify LLM",
+                notify_llm_source=self.mm.config.url + "/channels/" + self.route.channel_id,
+                notify_llm_event_id=post["id"],
                 observed_at=datetime.fromtimestamp(post["create_at"] / 1000, timezone.utc)).model_dump(mode="json")
             # A TC reply requires delivery to this channel session. Inbound roots
             # published by it are source references, not invented TC deliveries.

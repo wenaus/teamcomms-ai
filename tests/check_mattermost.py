@@ -158,7 +158,7 @@ class PlatformChecks(unittest.IsolatedAsyncioTestCase):
         root_post = self.mm.posts[0]
         inbound = Inbound(self.mm, self.tc, self.store, self.route, self.receiver.session_id)
         post = {"id": "human-post", "channel_id": CHANNEL, "user_id": HUMAN,
-                "message": "Acknowledged by operator", "root_id": root_post["id"], "create_at": 2000}
+                "message": "Acknowledged by operator", "props": {"notify_llm": True}, "root_id": root_post["id"], "create_at": 2000}
         await inbound.publish(post)
         await inbound.publish(post)
         self.assertEqual(len(self.tc.published), 1)
@@ -176,7 +176,7 @@ class PlatformChecks(unittest.IsolatedAsyncioTestCase):
         inbound = Inbound(self.mm, self.tc, self.store, self.route, self.receiver.session_id)
         await inbound.once()  # Empty channel baseline.
         post = {"id": "human-post", "channel_id": CHANNEL, "user_id": HUMAN,
-                "message": "Original", "root_id": "", "create_at": 2000}
+                "message": "Original", "props": {"notify_llm": True}, "root_id": "", "create_at": 2000}
         self.mm.posts = [post]
         self.tc.lose_response = True
         with self.assertRaises(httpx.ReadTimeout):

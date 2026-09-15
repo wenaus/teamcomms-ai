@@ -95,14 +95,30 @@ class TeamCommsCapcom {
     const urgency=this.field('Urgency',d,'select');for(const v of ['normal','urgent','alarm','routine'])this.el('option',v,urgency);
     const content=this.field('Notice',d,'textarea');content.id='capcom-content';content.maxLength=8000;
     const source=this.field('Source',d);source.maxLength=240;
-    this.el('small','Saved in this topic. Explicit API audiences control delivery to sessions and channels.',d);
-    this.button('Record notice',d,async()=>{const body={notice_id:this.pending?.body?.notice_id||crypto.randomUUID(),topic_id:id,kind:kind.value,urgency:urgency.value,content:content.value,source:source.value,observed_at:this.pending?.body?.observed_at||new Date().toISOString()};await this.mutate('/api/capcom/notices',body);content.value='';await this.open(id);await this.list(0);});
+    this.el('small','Saved in this topic. Severity alone does not notify an AI session.',d);
+    const notify=this.field('Notify LLM',d);notify.type='checkbox';notify.id='capcom-notify-llm';
+    notify.disabled=!this.identity.scopes.includes('comms:write');
+    const selection=this.el('div',undefined,d);selection.hidden=true;
+    const reason=this.field('Reason for requesting model attention',selection);reason.maxLength=1000;
+    const recipients=this.field('Recipients',selection,'select');recipients.multiple=true;recipients.size=4;
+    const load=this.button('Refresh recipients',selection,async()=>{
+      const [directory,people]=await Promise.all([this.api('/api/comms/sessions?limit=100'),this.api('/api/participants?limit=200')]);
+      if(directory.next_offset!==null||people.next_offset!==null)throw new Error('Directory is too large for this selector. Use Notify LLM from a script with an explicit audience.');
+      const ai=new Set(people.participants.filter(p=>p.kind==='ai').map(p=>p.participant_id));recipients.replaceChildren();
+      for(const s of directory.sessions.filter(s=>ai.has(s.participant_id))){const option=this.el('option',s.name+' · '+s.host+' · '+s.state,recipients);option.value=s.session_id;}
+    });
+    notify.onchange=()=>{selection.hidden=!notify.checked;if(notify.checked)load.click();};
+    const record=this.button('Record notice',d,async()=>{const body={notice_id:this.pending?.body?.notice_id||crypto.randomUUID(),topic_id:id,kind:kind.value,urgency:urgency.value,content:content.value,source:source.value,observed_at:this.pending?.body?.observed_at||new Date().toISOString()};
+      if(notify.checked){const session_ids=Array.from(recipients.selectedOptions).map(o=>o.value);if(!reason.value.trim()||!session_ids.length)throw new Error('Notify LLM requires a reason and selected recipients.');Object.assign(body,{notify_llm:true,notify_llm_reason:reason.value,audience:{session_ids}});}
+      await this.mutate('/api/capcom/notices',body);content.value='';await this.open(id);await this.list(0);});
+    notify.addEventListener('change',()=>{record.textContent=notify.checked?'Record notice and Notify LLM':'Record notice';});
   }
   async notices(id,before){
     const generation=this.openGeneration,feed=this.feed,more=this.moreNotices;const r=await this.api('/api/capcom/notices?'+new URLSearchParams({topic_id:id,limit:25,...(before?{before}:{})}));if(this.openGeneration!==generation||feed!==this.feed)return;if(!before)feed.replaceChildren();
     const routine=this.el('details',undefined,this.feed);let count=0;const summary=this.el('summary','Routine coordination',routine);
-    for(const n of r.notices){const folded=n.kind==='routine'&&n.urgency==='routine';const row=this.el('div',undefined,folded?routine:this.feed,'capcom-card');if(folded)count++;
+    for(const n of r.notices){const folded=!n.notify_llm&&n.kind==='routine'&&n.urgency==='routine';const row=this.el('div',undefined,folded?routine:this.feed,'capcom-card');if(folded)count++;
       row.id='notice-'+n.notice_id;this.el('strong',n.kind+' · '+n.urgency+' · '+n.author_name,row);this.el('small','Observed '+n.observed_at+' · recorded '+n.created_at+(n.source?' · '+n.source:''),row);this.el('p',n.content,row,'capcom-content');
+      if(n.notify_llm)this.el('p','Notify LLM · '+n.notify_llm_reason,row);
       if(n.decision)this.el('p',n.decision.resolved_at?'Resolved: '+n.decision.resolution:'Decision open',row);
       for(const delivery of n.deliveries)this.el('small',delivery.session_id+' · '+delivery.state+' · presentation '+delivery.presentation.disposition+(delivery.presentation.due_at?' until '+delivery.presentation.due_at:'')+(delivery.presentation.coalesced_into?' into '+delivery.presentation.coalesced_into:'')+' · '+(delivery.considered_at?'considered':'consideration unconfirmed'),row);
     }

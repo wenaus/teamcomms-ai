@@ -15,6 +15,8 @@ routing, durable messages, delivery receipts, and HTTP streaming/replay.
 native delivery, and local recovery, with explicit host configuration.
 [Mattermost and watchers](docs/mattermost.md) provide explicit channel routes,
 external provenance, thread preservation, and durable event publication.
+[Notify LLM](docs/notify-llm.md) is the explicit, sparse path for scripts, Capcom
+and selected live-feed posts to request model attention.
 [Dialog](docs/dialog.md) provides attributed transcript capture, bounded history,
 and opt-in session bootstrap. [Pouch](docs/pouch.md) is the team's canonical
 working document, with surgical edits, atomic bulk previews, and saved revision

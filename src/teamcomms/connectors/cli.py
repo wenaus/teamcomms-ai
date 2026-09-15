@@ -20,6 +20,7 @@ CALLS = {
     "heartbeat_session": ("POST", "/sessions/heartbeat"), "list_resources": ("GET", "/resources"),
     "list_groups": ("GET", "/groups"), "subscribe": ("POST", "/subscriptions"),
     "send_message": ("POST", "/messages"), "get_messages": ("GET", "/messages"),
+    "notify_llm": ("POST", "/notify-llm"),
     "get_message": ("GET", "/messages/read"), "record_delivery": ("POST", "/deliveries"),
     "acknowledge_message": ("POST", "/messages/acknowledge"), "get_delivery_history": ("GET", "/deliveries/history"),
 }
@@ -101,7 +102,10 @@ async def call(args, config):
     method, path = methods[args.tool]
     try:
         # Persist outgoing messages before attempting network publication.
-        if args.tool == "send_message":
+        if args.tool in {"send_message", "notify_llm"}:
+            if args.tool == "notify_llm":
+                from teamcomms.comms.schemas import NotifyLLM
+                body = NotifyLLM(**body).model_dump(mode="json")
             directory = private_directory(config.state_dir) / "outgoing"
             store = Store(directory)
             try:
@@ -232,6 +236,8 @@ def main():
     mattermost.add_argument("--routes", required=True, help="Mattermost endpoint/token/routes JSON")
     watcher = commands.add_parser("publish-event", help="Publish one stable watcher event from JSON or stdin (-)")
     watcher.add_argument("event", help="JSON file path or - for stdin")
+    notify = commands.add_parser("notify-llm", help="Deliberately notify selected AI sessions from a saved JSON event")
+    notify.add_argument("event", help="JSON file path or - for stdin")
     record = commands.add_parser("record", help="Record a selected native transcript with a durable cursor")
     record.add_argument("--session-id", required=True)
     record.add_argument("--native-id", required=True)
@@ -273,14 +279,15 @@ def main():
         elif args.command == "mattermost":
             from .mattermost import MattermostConfig, run
             asyncio.run(run(config, load(args.routes, MattermostConfig), str(Path(args.config).resolve())))
-        elif args.command == "publish-event":
-            from .watcher import publish_event
+        elif args.command in {"publish-event", "notify-llm"}:
+            from .watcher import publish_event, notify_llm
             event = json.load(sys.stdin) if args.event == "-" else json.loads(Path(args.event).read_text())
             async def publish():
                 service = ServiceClient(config)
                 store = Store(private_directory(config.state_dir) / "outgoing")
                 try:
-                    return await publish_event(service, store, **event)
+                    operation = notify_llm if args.command == "notify-llm" else publish_event
+                    return await operation(service, store, **event)
                 finally:
                     store.close()
                     await service.close()

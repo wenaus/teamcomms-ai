@@ -24,6 +24,9 @@ search, Ctrl/Cmd B/I format and Ctrl/Cmd K inserts a link. Escape then Tab leave
 the editor. The source pane is vertically resizable. Theme selection supports
 system, light and dark; theme, source/rendered view and autosave preference
 persist in the browser for the installation path.
+The saved theme is applied by a blocking same-origin script before styles and
+the editor load, so navigation does not briefly render the light theme. System
+preference is the fallback when no valid saved preference exists.
 
 Entries can be searched, opened by permanent UUID link, created with a readable
 slug, edited, archived and inspected by revision. The editor writes title,
@@ -132,5 +135,7 @@ state. Routine notices fold visually while retaining their original rows.
 
 An owned-session panel edits opt-in routine presentation and quiet periods.
 Unsupported receivers are labeled and retain immediate delivery. Alarms and
-human instructions bypass routine policy. Topic creation, reference edits and
+human instructions bypass routine policy after routing admission. New AI
+notifications require the separate **Notify LLM** selection, regardless of severity.
+Topic creation, reference edits and
 notice publication retain stable mutation IDs for uncertain browser retries.

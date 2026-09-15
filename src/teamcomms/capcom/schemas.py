@@ -59,11 +59,17 @@ class PublishNotice(Mutation):
     observed_at: datetime
     audience: Audience | None = None
     sender_session_id: UUID | None = None
+    notify_llm: bool = False
+    notify_llm_reason: str = Field(default='',max_length=1000)
 
     @model_validator(mode='after')
     def timezone_required(self):
         if self.observed_at.utcoffset() is None:raise ValueError('Observation time requires timezone')
         if self.kind=='state' and not self.source.strip():raise ValueError('Sampled state requires source')
+        if self.notify_llm and (self.audience is None or not self.notify_llm_reason.strip()):
+            raise ValueError('Notify LLM requires an explicit audience and reason')
+        if not self.notify_llm and self.notify_llm_reason:
+            raise ValueError('Notify LLM reason requires explicit selection')
         return self
 
 

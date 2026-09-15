@@ -56,8 +56,16 @@ def _targets(actor, request):
     selector |= Q(pk__in=subscriptions.values("session_id"))
     direct.update(online(all_sessions).filter(selector).values_list("id", flat=True).distinct()[:102])
     direct.discard(request.sender_session_id)
+    if request.kind == "notification" or request.external_source is not None:
+        ai = set(all_sessions.filter(id__in=direct, membership__participant__kind="ai")
+                 .values_list("id", flat=True))
+        if request.notify_llm:
+            if not ai:
+                raise AccessError("Notify LLM has no eligible AI sessions", 409)
+        else:
+            direct -= ai
     if not direct:
-        raise AccessError("Audience has no eligible destinations", 409)
+        raise AccessError("Audience has no eligible destinations; AI notifications require Notify LLM", 409)
     if len(direct) > 100:
         raise AccessError("Audience exceeds 100 destinations; narrow the audience", 400)
     return direct
@@ -70,6 +78,9 @@ def send_message(actor, request):
     if request.external_source is None:
         # Preserve exact retry equality with envelopes stored before this field.
         envelope.pop("external_source")
+    if not request.notify_llm:
+        for field in ("notify_llm", "notify_llm_reason", "notify_llm_source", "notify_llm_event_id"):
+            envelope.pop(field)
     lock(f"tc-message:{request.message_id}")
     existing = Message.objects.filter(pk=request.message_id).first()
     if existing:
@@ -108,6 +119,11 @@ def send_message(actor, request):
     if request.reply_to:
         _acknowledge(sender.id, request.reply_to)
     return publication_record(message)
+
+
+def notify_llm(actor, request):
+    """Explicit model attention with the same durable publication and receipt path."""
+    return send_message(actor, request)
 
 
 def publication_record(message):

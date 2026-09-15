@@ -15,7 +15,8 @@
     if (editor) editor.cm.setOption('theme',document.documentElement.dataset.theme==='dark'?'material-darker':'default');
   }
   let editor=null;
-  $('theme').value=storageGet(pref+'theme')||'system'; theme();
+  const savedTheme=storageGet(pref+'theme');
+  $('theme').value=['system','light','dark'].includes(savedTheme)?savedTheme:'system'; theme();
   $('theme').onchange=()=>{storageSet(pref+'theme',$('theme').value);theme();}; media.addEventListener('change',theme);
   async function api(path,data) {
     const options={credentials:'same-origin',cache:'no-store',redirect:'error',headers:{Accept:'application/json'}};
