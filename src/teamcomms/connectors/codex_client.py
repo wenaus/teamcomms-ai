@@ -27,13 +27,19 @@ class CodexClient:
         self._pending = {}
 
     async def __aenter__(self):
-        info = self.socket_path.lstat()
+        path = self.socket_path
+        if path.is_symlink():
+            # A launcher may expose the app-server socket through a link it owns.
+            if path.lstat().st_uid != os.getuid():
+                raise ValueError("Select an app-server socket owned by the current user")
+            path = path.resolve(strict=True)
+        info = path.lstat()
         if not stat.S_ISSOCK(info.st_mode) or info.st_uid != os.getuid():
             raise ValueError("Select an app-server socket owned by the current user")
         if info.st_mode & 0o077:
             raise ValueError("The app-server socket must be private to its owner")
         self.ws = await unix_connect(
-            str(self.socket_path), uri="ws://localhost/", compression=None,
+            str(path), uri="ws://localhost/", compression=None,
             proxy=None, open_timeout=self.timeout, max_size=4 * 1024 * 1024,
         )
         self._reader = asyncio.create_task(self._read())
