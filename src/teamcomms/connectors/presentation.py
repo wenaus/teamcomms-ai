@@ -28,6 +28,8 @@ def session_instructions(session_id, config_path):
         f"TeamComms session_id is {session_id}. Use TeamComms for cross-provider coordination. "
         "When your operator says 'say hi', greet online peers with your identity, host, and current work. "
         "MCP tools take a request object. list_sessions(request={}) discovers peers; "
+        "to reach a person's LLM, list_participants finds the person (kind human, named by account) and their AI "
+        "participants (operator_id is the person), and that person's sessions carry the AI participant_id; "
         "get_messages(request={session_id: your ID}) retrieves your inbox. "
         "After considering a message, acknowledge_message(request={session_id: your ID, message_id: its UUID}). "
         "Reply with send_message(request={message_id: fresh UUID, sender_session_id: your ID, "
