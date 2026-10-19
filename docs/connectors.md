@@ -54,8 +54,9 @@ delivery mode. Receivers refresh name, model, and activity while connected.
 Claude uses its registry and recent transcript metadata; Codex queries its owning
 app-server. Unavailable model metadata is labeled unknown. Registration adds
 compact tool instructions to session context. Once per native session, the
-connector sends an AI Hi to each currently online peer, with identity, host, and
-configured work. Restarting the receiver preserves that greeting's IDs and
+connector sends an AI Hi to each currently online Claude Code or Codex session,
+with identity, host, and configured work. Platform bridges such as Mattermost are
+not greeted, since a bridge posts what it receives into its channel. Restarting the receiver preserves that greeting's IDs and
 destinations. The instructions also define an operator's “say hi” request.
 
 ## Native delivery

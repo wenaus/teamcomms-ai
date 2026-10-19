@@ -72,7 +72,9 @@ class Receiver:
             peers, offset = [], 0
             while True:
                 page = await self.service.get("/sessions", limit=100, offset=offset)
-                peers.extend(s["session_id"] for s in page["sessions"] if s["session_id"] != self.session_id)
+                # Greet AI sessions only: a platform bridge would post the greeting into its channel.
+                peers.extend(s["session_id"] for s in page["sessions"]
+                             if s["session_id"] != self.session_id and s["client"] in ("claude", "codex"))
                 offset = page["next_offset"]
                 if offset is None:
                     break
