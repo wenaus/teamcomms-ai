@@ -72,7 +72,10 @@ through the launch settings. It preserves explicitly supplied settings and exist
 hooks. The hook registers the session, supplies instructions, and starts a receiver.
 The receiver allows 30 seconds for the native registry to appear. Socket ownership,
 permissions, session ID, and owner PID are checked before delivery. An exported
-messaging token is passed through the socket authentication frame. Print-mode
+messaging token is passed through the socket authentication frame. The frame's
+priority is `next`, which waits for the turn's next boundary; `now` aborts the
+turn (Claude Code 2.1.303), and an aborted question or tool reads to the model
+as the operator's refusal. Print-mode
 launches bypass enrollment.
 
 The Claude socket and registry format are version-dependent interfaces inherited

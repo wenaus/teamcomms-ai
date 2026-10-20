@@ -25,8 +25,10 @@ def send(socket_path, session_id, text, sender, message_id, token=None):
         raise ValueError("Message is empty")
     uuid.UUID(session_id)
     uuid.UUID(message_id)
+    # "next" waits for the turn's next boundary. "now" aborts the turn, and an
+    # aborted question or tool reads to the model as the operator's refusal.
     frame = {"type": "user", "session_id": session_id, "uuid": message_id,
-             "msg_id": message_id, "from": sender, "priority": "now",
+             "msg_id": message_id, "from": sender, "priority": "next",
              "message": {"role": "user", "content": envelope(text, message_id)}}
     payload = (json.dumps(frame, ensure_ascii=False) + "\n").encode()
     if len(payload) > 65536:
