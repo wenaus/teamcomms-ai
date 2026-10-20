@@ -14,6 +14,7 @@ import time
 from websockets.exceptions import WebSocketException
 
 from .codex_client import CodexClient
+from .registration import notice
 from .startup import spawn
 
 logger = logging.getLogger(__name__)
@@ -212,6 +213,9 @@ def claude_settings(arguments, command):
 
 def launch(client, arguments, config, config_path):
     config_path = str(Path(config_path).resolve())
+    missing = notice(client, config, os.getcwd())
+    if missing:
+        print(missing, file=sys.stderr)
     # Native commands continue to use the installation's existing settings and auth.
     if client == "claude":
         command = shlex.join([sys.executable, "-m", "teamcomms.connectors.cli", "--config", config_path, "hook", "claude"])

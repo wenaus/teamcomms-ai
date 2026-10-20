@@ -10,6 +10,7 @@ from uuid import UUID
 from .cli import state_path
 from .client import ServiceClient
 from .presentation import session_instructions
+from .registration import notice
 from .state import Store, private_directory
 
 
@@ -64,10 +65,13 @@ def hook(config, config_path, data):
     try:
         result = asyncio.run(asyncio.wait_for(register(config, native_id, name, cwd, model), timeout=3))
     except Exception as error:
-        return f"TeamComms enrollment is retrying in the receiver ({type(error).__name__}); inspect teamcomms-connect status."
+        return "\n\n".join(filter(None, (notice("claude", config, cwd),
+            f"TeamComms enrollment is retrying in the receiver ({type(error).__name__}); inspect teamcomms-connect status.")))
     store = Store(state_path(config, "claude", native_id))
     try:
         store.put("instructions", True)
     finally:
         store.close()
-    return session_instructions(result["session_id"], config_path) + "\n\n" + result.get("bootstrap_context", "")
+    missing = notice("claude", config, cwd)
+    return ("\n\n".join(filter(None, (missing, session_instructions(result["session_id"], config_path))))
+            + "\n\n" + result.get("bootstrap_context", ""))

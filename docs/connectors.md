@@ -120,8 +120,15 @@ listed below.
 
 ## Tools and recovery
 
-Sessions use the service's MCP tools, or the included HTTP helper. The helper
-also exposes Entries reads, surgical/bulk edits and Pouch lookup/initialization/
+Sessions use the service's MCP tools, or the included HTTP helper. The MCP
+endpoint is `<url>/mcp/`, registered once per machine with the connector's
+token: `claude mcp add --scope user --transport http teamcomms <url>/mcp/
+--header "Authorization: Bearer $(cat <token file>)"`, or for Codex a
+`[mcp_servers.teamcomms]` entry in `~/.codex/config.toml` with that `url` and
+`bearer_token_env_var`. The connector does not register it; at every start the
+launcher, the Claude hook and the Codex receiver check the client's
+configuration and, when no server points at the endpoint, tell the session and
+the operator the command that registers it. The helper also exposes Entries reads, surgical/bulk edits and Pouch lookup/initialization/
 export. All CLI JSON objects contain the request fields directly, without an
 outer `request` wrapper. Editing retry UUIDs belong in the original saved request;
 reuse that exact object after a lost response and inspect the returned status.

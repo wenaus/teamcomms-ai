@@ -11,6 +11,7 @@ from websockets.exceptions import WebSocketException
 
 from .client import ServiceError
 from .presentation import message_text, session_instructions
+from .registration import notice
 
 logger = logging.getLogger(__name__)
 
@@ -48,6 +49,9 @@ class Receiver:
             from .dialog import bootstrap_context
             history = await bootstrap_context(self.service, self.service.config)
             instructions = session_instructions(self.session_id, self.config_path)
+            missing = notice(self.registration["client"], self.service.config, self.registration.get("workspace") or ".")
+            if missing:
+                instructions = missing + "\n\n" + instructions
             if history:
                 instructions += "\n\n" + history
             self.store.put("setup_state", "injecting")

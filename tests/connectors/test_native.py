@@ -106,3 +106,20 @@ def test_configuration_requires_explicit_private_credentials(tmp_path):
         Configuration(url="http://external.example", token_file=token)
     with pytest.raises(ValueError):
         Configuration(url="https://user:secret@example", token_file=token)
+
+
+def test_registration_notice_names_the_command_until_the_endpoint_is_registered(tmp_path, monkeypatch):
+    from teamcomms.connectors.registration import notice
+    token = tmp_path / "token"
+    config = Configuration(url="https://example.org/teamcomms", token_file=token)
+    monkeypatch.setenv("CLAUDE_CONFIG_DIR", str(tmp_path))
+    monkeypatch.setenv("CODEX_HOME", str(tmp_path))
+    missing = notice("claude", config, tmp_path)
+    assert "claude mcp add --scope user --transport http teamcomms https://example.org/teamcomms/mcp/" in missing
+    assert f"$(cat {token})" in missing
+    (tmp_path / ".claude.json").write_text(json.dumps(
+        {"mcpServers": {"tc": {"type": "http", "url": "https://example.org/teamcomms/mcp"}}}))
+    assert notice("claude", config, tmp_path) == ""
+    assert "[mcp_servers.teamcomms]" in notice("codex", config, tmp_path)
+    (tmp_path / "config.toml").write_text('[mcp_servers.teamcomms]\nurl = "https://example.org/teamcomms/mcp/"\n')
+    assert notice("codex", config, tmp_path) == ""
