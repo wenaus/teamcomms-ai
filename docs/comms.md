@@ -37,6 +37,9 @@ complete metadata and resource set. Heartbeats change activity and optionally
 name, model, and effort. States are `idle`, `active`, `unknown`, and `offline`.
 Online discovery requires active membership, a non-offline state, and a heartbeat
 within 90 seconds. Availability and delivery mode are distinct fields.
+Each session record also carries its participant's name and kind and, for an
+AI participant, its operator's ID and name, so one directory query shows who
+is online and whose sessions they are.
 
 Canonical resources have a unique installation key and a stable UUID. Kinds are
 `project`, `checkout`, and `service`. A checkout names a host, a project resource,

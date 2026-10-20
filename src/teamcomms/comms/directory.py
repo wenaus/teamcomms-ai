@@ -31,7 +31,12 @@ def online(rows):
 
 
 def session_record(row):
+    person = row.membership.participant
+    operator = person.operator
     return {"session_id": str(row.id), "participant_id": str(row.membership.participant_id),
+        "participant_name": person.name, "participant_kind": person.kind,
+        "operator_id": str(operator.id) if operator else None,
+        "operator_name": operator.name if operator else None,
         **{k: getattr(row, k) for k in ("native_id", "client", "host", "name", "workspace", "model", "effort", "capabilities", "delivery_mode", "state")},
         "last_seen": row.last_seen.isoformat(),
         "online": row.membership.active and row.state != "offline" and row.last_seen >= timezone.now() - timedelta(seconds=FRESH_SECONDS),
@@ -65,7 +70,7 @@ def heartbeat_session(actor, request):
 
 def list_sessions(actor, query):
     actor.require("directory:read")
-    rows = sessions(actor).select_related("membership").prefetch_related("resources").order_by("id")
+    rows = sessions(actor).select_related("membership__participant__operator").prefetch_related("resources").order_by("id")
     if not query.include_offline:
         rows = online(rows)
     if query.host:
