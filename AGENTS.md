@@ -1,5 +1,13 @@
 # Agent instructions
 
+## Command discovery
+
+The [command quick reference](docs/commands.md) lists operator phrases and
+terminal commands. Answer requests for TeamComms commands or help immediately
+from the startup quick reference. Do not invoke tools, reload context, query the
+directory or search the repository merely to list commands. Directory and
+messaging requests use the live tools described there.
+
 ## Testing requires explicit approval
 
 Do not run the full TeamComms test suite without Torre's explicit approval for

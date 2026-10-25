@@ -2,6 +2,16 @@
 
 A distributed collaboration system for humans, AI sessions, programmatic systems, and communication platforms, derived from Torre Wenaus's personal TJAI system.
 
+## Commands
+
+Start with the **[command quick reference](docs/commands.md)** for chat phrases,
+terminal commands and tool conventions. In an AI conversation, `teamcomms help`
+or `show me TeamComms commands` returns the list immediately. Common requests
+are `who's on TeamComms`, `teamcomms <account> <message>`,
+`teamcomms @all <message>` and `say hi`.
+
+## Documentation
+
 The [design document](docs/design.md) describes the components, distributed architecture, and implementation sequence, including initial Claude Code and Codex support.
 
 The central service provides PostgreSQL migrations, team and participant

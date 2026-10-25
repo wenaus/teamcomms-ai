@@ -6,6 +6,11 @@ them through the selected local client. Each host runs its own receivers;
 PostgreSQL holds the authoritative directory, messages, and receipts. Local
 SQLite state records outgoing retries, replay cursors, and dispatch progress.
 
+The **[command quick reference](commands.md)** lists chat phrases, terminal
+commands and MCP conventions. Connector startup includes the chat commands as
+a separate quick-reference block so an AI can answer command-list requests
+immediately without discovery calls.
+
 ## Installation and enrollment
 
 For an [embedded installation](embedded.md), use the host's external TC base URL
