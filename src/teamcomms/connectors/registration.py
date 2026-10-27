@@ -1,9 +1,12 @@
 """Whether the client has the service's MCP tools registered, and how to register them.
 
 The connector delivers messages; the session's TeamComms tools come from the
-service's MCP endpoint, which the client registers itself. A session without
-them falls back to the command-line helper, so the connector names the gap and
-the command that closes it at every start.
+service's MCP endpoint. A client with a registration of its own keeps it. For a
+client without one, the launcher supplies the endpoint to the session it starts,
+and only to that session (launch_supplied, claude_mcp_config, codex_overrides),
+so sessions started without the connector never reach TeamComms. A session
+without the tools falls back to the command-line helper, and the connector names
+the gap at its start.
 """
 
 import json
@@ -13,8 +16,33 @@ import shlex
 import tomllib
 
 
+LAUNCHED = "TEAMCOMMS_MCP_ENDPOINT"  # set by the launcher when it supplies the endpoint itself
+
+
 def endpoint(config):
     return config.url + "/mcp/"
+
+
+def launch_supplied(config):
+    """True in a session the launcher started with the endpoint it supplied."""
+    return os.environ.get(LAUNCHED, "").rstrip("/") == endpoint(config).rstrip("/")
+
+
+def claude_mcp_config(config, directory):
+    """A private --mcp-config file for one launched Claude session."""
+    path = Path(directory) / "mcp.json"
+    token = config.token()
+    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w") as f:
+        json.dump({"mcpServers": {"teamcomms": {"type": "http", "url": endpoint(config),
+                                                "headers": {"Authorization": f"Bearer {token}"}}}}, f)
+    return path
+
+
+def codex_overrides(config):
+    """Codex configuration overrides that give one launched app-server the endpoint."""
+    return ["-c", f'mcp_servers.teamcomms.url="{endpoint(config)}"',
+            "-c", 'mcp_servers.teamcomms.bearer_token_env_var="TEAMCOMMS_TOKEN"']
 
 
 def _points_here(servers, config):
@@ -51,6 +79,8 @@ def codex_registered(config):
 def notice(client, config, cwd):
     """The missing-registration notice for this client, or empty when the tools are registered."""
     token = shlex.quote(str(config.token_file))
+    if launch_supplied(config):
+        return ""
     if client == "claude":
         if claude_registered(config, cwd):
             return ""

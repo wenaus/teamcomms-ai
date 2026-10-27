@@ -129,14 +129,21 @@ listed below.
 ## Tools and recovery
 
 Sessions use the service's MCP tools, or the included HTTP helper. The MCP
-endpoint is `<url>/mcp/`, registered once per machine with the connector's
-token: `claude mcp add --scope user --transport http teamcomms <url>/mcp/
---header "Authorization: Bearer $(cat <token file>)"`, or for Codex a
-`[mcp_servers.teamcomms]` entry in `~/.codex/config.toml` with that `url` and
-`bearer_token_env_var`. The connector does not register it; at every start the
-launcher, the Claude hook and the Codex receiver check the client's
-configuration and, when no server points at the endpoint, tell the session and
-the operator the command that registers it. The helper also exposes Entries reads, surgical/bulk edits and Pouch lookup/initialization/
+endpoint is `<url>/mcp/`. The launcher supplies it to each session it starts,
+and only to that session, so a client started without the connector never
+reaches the service: Claude Code gets `--mcp-config`, last among its arguments,
+naming a private file (mode 0600, in a mode-0700 runtime directory removed when
+the session ends) that carries the connector's token; the Codex app-server gets
+`-c mcp_servers.teamcomms.url` and `bearer_token_env_var` overrides, with
+`TEAMCOMMS_TOKEN` in its environment. A client that already has a server at the
+endpoint keeps it and gets nothing added: a user-scope registration (`claude mcp
+add --scope user --transport http teamcomms <url>/mcp/ --header "Authorization:
+Bearer $(cat <token file>)"`, or a `[mcp_servers.teamcomms]` entry in
+`~/.codex/config.toml`) gives every session on the machine the tools. A session
+the launcher supplied carries `TEAMCOMMS_MCP_ENDPOINT`; elsewhere the Claude
+hook and the receivers check the client's configuration and, when no server
+points at the endpoint, tell the session and the operator the command that
+registers it. The helper also exposes Entries reads, surgical/bulk edits and Pouch lookup/initialization/
 export. All CLI JSON objects contain the request fields directly, without an
 outer `request` wrapper. Editing retry UUIDs belong in the original saved request;
 reuse that exact object after a lost response and inspect the returned status.

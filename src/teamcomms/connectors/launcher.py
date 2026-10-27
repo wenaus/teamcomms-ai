@@ -6,6 +6,7 @@ import logging
 import os
 from pathlib import Path
 import shlex
+import shutil
 import signal
 import subprocess
 import sys
@@ -14,7 +15,8 @@ import time
 from websockets.exceptions import WebSocketException
 
 from .codex_client import CodexClient
-from .registration import notice
+from .registration import (LAUNCHED, claude_mcp_config, claude_registered, codex_overrides,
+                           codex_registered, endpoint)
 from .startup import spawn
 
 logger = logging.getLogger(__name__)
@@ -211,17 +213,32 @@ def claude_settings(arguments, command):
     return ["--settings", json.dumps({"hooks": {"SessionStart": [{"hooks": [setting]}]}}), *arguments]
 
 
+def with_mcp_config(arguments, path):
+    """Claude's --mcp-config takes a list of values, so it goes last, before
+    any "--", where nothing after it can be read as a configuration."""
+    arguments = list(arguments)
+    end = arguments.index("--") if "--" in arguments else len(arguments)
+    return [*arguments[:end], "--mcp-config", str(path), *arguments[end:]]
+
+
 def launch(client, arguments, config, config_path):
     config_path = str(Path(config_path).resolve())
-    missing = notice(client, config, os.getcwd())
-    if missing:
-        print(missing, file=sys.stderr)
     # Native commands continue to use the installation's existing settings and auth.
     if client == "claude":
         command = shlex.join([sys.executable, "-m", "teamcomms.connectors.cli", "--config", config_path, "hook", "claude"])
         if any(arg in {"-p", "--print"} for arg in arguments):
             return subprocess.call(["claude", *arguments])  # Background jobs do not greet or enroll.
-        return subprocess.call(["claude", *claude_settings(arguments, command)])
+        if claude_registered(config, os.getcwd()):
+            return subprocess.call(["claude", *claude_settings(arguments, command)])
+        # No registration of the client's own: this session alone gets the
+        # endpoint, from a private file removed when the session ends.
+        directory = Path(tempfile.mkdtemp(prefix="teamcomms-claude-"))
+        try:
+            mcp = claude_mcp_config(config, directory)
+            env = {**os.environ, LAUNCHED: endpoint(config)}
+            return subprocess.call(["claude", *with_mcp_config(claude_settings(arguments, command), mcp)], env=env)
+        finally:
+            shutil.rmtree(directory, ignore_errors=True)
     options = launch_options(arguments)
     if options is None or not sys.stdin.isatty():
         return subprocess.call(["codex", *arguments])
@@ -229,6 +246,10 @@ def launch(client, arguments, config, config_path):
     directory = Path(tempfile.mkdtemp(prefix="teamcomms-codex-"))
     address = "unix://" + str(directory / "codex.sock")
     env = {**os.environ, "TEAMCOMMS_CODEX_SOCKET": str(directory / "codex.sock")}
+    if not codex_registered(config):
+        # This app-server alone gets the endpoint, its token in its environment.
+        server_config = [*codex_overrides(config), *server_config]
+        env.update({LAUNCHED: endpoint(config), "TEAMCOMMS_TOKEN": config.token()})
     with (directory / "runtime.log").open("w") as log:
         server = subprocess.Popen(["codex", *server_config, "app-server", "--listen", address], cwd=cwd, env=env,
             stdin=subprocess.DEVNULL, stdout=log, stderr=log, start_new_session=True)
