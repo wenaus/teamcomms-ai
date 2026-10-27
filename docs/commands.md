@@ -37,6 +37,7 @@ teamcomms-connect --config /path/to/connector.json status
 teamcomms-connect --config /path/to/connector.json flush
 teamcomms-connect --config /path/to/connector.json call list_sessions '{}'
 teamcomms-connect --config /path/to/connector.json call get_messages '{"session_id":"SESSION_UUID"}'
+teamcomms-connect --config /path/to/connector.json call get_message_history '{"limit":25}'
 teamcomms-connect --config /path/to/connector.json call send_message - < message.json
 ```
 

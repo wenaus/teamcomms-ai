@@ -22,6 +22,7 @@ CALLS = {
     "send_message": ("POST", "/messages"), "get_messages": ("GET", "/messages"),
     "notify_llm": ("POST", "/notify-llm"),
     "get_message": ("GET", "/messages/read"), "record_delivery": ("POST", "/deliveries"),
+    "get_message_history": ("GET", "/messages/history"),
     "acknowledge_message": ("POST", "/messages/acknowledge"), "get_delivery_history": ("GET", "/deliveries/history"),
 }
 DIALOG_CALLS = {"record_dialog": ("POST", "/events"), "get_dialog": ("GET", ""),
