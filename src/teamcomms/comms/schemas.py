@@ -167,6 +167,13 @@ class MessageQuery(Page):
     message_id: UUID
 
 
+class MessageHistory(Request):
+    cursor: str | None = Field(default=None, min_length=1, max_length=2048)
+    limit: int = Field(default=25, ge=1, le=100)
+    direction: Literal["all", "sent", "received"] = "all"
+    topic: str | None = Field(default=None, max_length=160)
+
+
 class Report(Request):
     receipt_id: UUID
     delivery_id: UUID

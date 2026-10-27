@@ -2,9 +2,10 @@
 
 from starlette.routing import Route
 from teamcomms.service.dispatch import invoke
-from . import directory, operations
+from . import directory, history, operations
 from .schemas import (Acknowledge, DeliveryHistory, Heartbeat, Inbox, MessageQuery, NewGroup,
-                      NewResource, Page, RegisterSession, Report, SendMessage, Sessions, Subscribe, NotifyLLM)
+                      NewResource, Page, RegisterSession, Report, SendMessage, Sessions, Subscribe, NotifyLLM,
+                      MessageHistory)
 from .stream import stream_messages
 
 
@@ -70,6 +71,11 @@ def register(mcp, endpoint):
         return await invoke(operations.get_message, request)
 
     @mcp.tool()
+    async def get_message_history(request: MessageHistory) -> dict:
+        """Read complete authored/received messages with verified parties; resume next_cursor."""
+        return await invoke(history.get_message_history, request)
+
+    @mcp.tool()
     async def record_delivery(request: Report) -> dict:
         """Record a version-checked transport receipt; reserve uncertain before injection."""
         return await invoke(operations.record_delivery, request)
@@ -93,6 +99,7 @@ def register(mcp, endpoint):
         ("/messages", {"GET": (operations.get_messages, Inbox), "POST": (operations.send_message, SendMessage)}),
         ("/notify-llm", {"POST": (operations.notify_llm, NotifyLLM)}),
         ("/messages/read", {"GET": (operations.get_message, MessageQuery)}),
+        ("/messages/history", {"GET": (history.get_message_history, MessageHistory)}),
         ("/messages/acknowledge", {"POST": (operations.acknowledge_message, Acknowledge)}),
         ("/deliveries", {"POST": (operations.record_delivery, Report)}),
         ("/deliveries/history", {"GET": (operations.delivery_history, DeliveryHistory)}),

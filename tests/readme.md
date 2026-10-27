@@ -50,6 +50,19 @@ commit-ordered cursors, immutable evidence, and access bounds.
 temporary database: cross-process wake-up, pre-connection recovery, cursor replay,
 and revocation while a stream is open.
 
+## Message history
+
+`tests/check_message_history.py` checks only the canonical message-history
+addition in a private socket-only PostgreSQL cluster: upgrade/backfill from the
+preceding schema, complete content, participant/operator metadata, fixed
+recipient visibility, pagination, receipt preservation, concurrent commit
+ordering and the new HTTP/MCP bindings. It does not invoke the suite runner,
+startup/streaming checks, native clients or deployed credentials.
+
+```sh
+.venv/bin/python tests/check_message_history.py
+```
+
 ## Connectors
 
 `tests/check_editing_pouch.py` is a focused check of surgical editing, durable

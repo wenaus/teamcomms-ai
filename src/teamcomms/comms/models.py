@@ -86,6 +86,12 @@ class MessageReference(models.Model):
     revision = models.ForeignKey("teamcomms_entries.Revision", null=True, on_delete=models.PROTECT)
 
 
+class MessagePosition(models.Model):
+    """Immutable publication order assigned by the database, including old writers."""
+
+    message = models.OneToOneField(Message, on_delete=models.PROTECT)
+
+
 class Delivery(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     message = models.ForeignKey(Message, related_name="deliveries", on_delete=models.PROTECT)

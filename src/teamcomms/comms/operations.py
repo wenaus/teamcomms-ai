@@ -145,9 +145,16 @@ def get_messages(actor, query):
             "next_after": selected[-1].sequence if selected else query.after, "has_more": len(page) > query.limit}
 
 
+def visible_messages(actor):
+    """Original authorship or fixed deliveries; operator identity grants no access."""
+    return Message.objects.filter(team_id=actor.team_id).filter(
+        Q(author_id=actor.participant_id) | Q(pk__in=Delivery.objects.filter(
+            session__membership__participant_id=actor.participant_id).values("message_id")))
+
+
 def get_message(actor, query):
     actor.require("comms:read")
-    row = Message.objects.filter(pk=query.message_id, team_id=actor.team_id).first()
+    row = visible_messages(actor).filter(pk=query.message_id).first()
     if row is None:
         raise AccessError("Message not found", 404)
     deliveries = row.deliveries.order_by("session_id")

@@ -177,6 +177,50 @@ receivers deduplicate by delivery ID. Reads and stream writes leave receipts int
 
 ## Interfaces and bounds
 
+### Authored and received message history
+
+`GET /api/comms/messages/history` and MCP `get_message_history(request)` enumerate
+canonical messages visible to the authenticated participant with `comms:read`.
+Visibility is exactly the single-message rule: the author or a fixed delivery to
+one of that participant's sessions, within the authenticated team. Operator
+associations do not grant another participant's access. No session registration,
+receipt, acknowledgment, or Dialog capture changes occur during a read.
+
+Requests accept `limit` (default 25, maximum 100), optional opaque `cursor`,
+`direction` (`all`, `sent`, `received`; default `all`), and optional exact `topic`.
+There is no participant selector or offset. The response is
+`{schema_version: 1, viewer, messages, next_cursor, has_more}`. Save `next_cursor`
+even for an empty page and reuse the same filters when polling. Cursors are
+signed and bound to the authenticated team, participant and filters.
+
+Each message retains the canonical envelope, UUID, author ID and original
+`created_at`. Its stored author snapshot appears as `publication_snapshot`;
+`author_identity` contains verified current directory identity. `sender_session`
+is nullable. `recipients` contains `{delivery_id, identity, session}` for every
+fixed destination visible under the single-message rule: authors see all;
+receivers see their own sessions only. Multiple owned-session deliveries produce
+one message row. `viewer_relation` contains boolean `sent` and `received`.
+
+Both `viewer` and each identity use `participant_id`, `participant_name`,
+`participant_kind`, `operator_id`, `operator_name`. Unknown operators remain
+null. A human's own participant ID is its human identity; no operator is inferred.
+Session metadata uses `session_id`, `name`, `host`, `client`, `model`, `native_id`.
+Directory identity and session metadata are current, separately from the stored
+publication snapshot. Message text is always complete, up to the existing
+16,000-character publication limit. Pages stop at the requested count or a
+1,000,000-byte aggregate serialized-message budget; at least one complete message
+is returned when available. `has_more` and `next_cursor` continue any shorter page.
+
+Migration `0003_message_history` adds an immutable separate position index, locks
+publication briefly, and backfills existing messages in `(created_at, UUID)`
+order without changing their evidence. This historical ordering does not claim
+to reconstruct past commit order. A database insertion trigger serializes each
+team's future position allocation under a transaction advisory lock, including
+publications from an older installed writer. New positions follow commit order;
+an uncommitted earlier publication cannot fall behind a saved cursor. Reads fix
+an upper watermark before selecting a page so concurrent commits are picked up
+by the next poll. Historical message timestamps remain unchanged.
+
 The following paths have the prefix `/api/comms`. MCP tools take a `request`
 object with the same fields as HTTP JSON bodies or GET parameters.
 
@@ -193,6 +237,7 @@ object with the same fields as HTTP JSON bodies or GET parameters.
 | `POST /messages` | `send_message` | Message ID, content, audience; optional envelope fields |
 | `GET /messages` | `get_messages` | Session ID, after, limit, pending-only |
 | `GET /messages/read` | `get_message` | Message ID, destination pagination |
+| `GET /messages/history` | `get_message_history` | Authored/received union, signed cursor, direction/topic filters |
 | `POST /messages/acknowledge` | `acknowledge_message` | Session ID, message ID |
 | `POST /deliveries` | `record_delivery` | Receipt ID, delivery ID, expected revision, state, detail |
 | `GET /deliveries/history` | `get_delivery_history` | Delivery ID, pagination |
