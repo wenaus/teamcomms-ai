@@ -95,7 +95,8 @@ async def detach_check(root):
     from unittest.mock import patch
     from teamcomms.connectors import cli
     session, native, participant = map(str, (uuid4(), uuid4(), uuid4()))
-    config = SimpleNamespace(host="synthetic", state_dir=root / "detached")
+    config = SimpleNamespace(host="synthetic", state_dir=root / "detached",
+                             url="http://localhost", token_file=root / "unused-token")
     args = SimpleNamespace(session_id=session, native_id=native, client="codex",
         transcript=str(root / "selected.jsonl"), config=str(root / "synthetic-connector.json"),
         pid=424242, socket="selected-owning.sock", detach=True, once=False, from_start=False)
@@ -233,3 +234,15 @@ def check(root, operator, operator_token, ai, ai_session):
     asyncio.run(recorder_privacy(root))
     asyncio.run(detach_check(root))
     print("Sharing privacy checks passed: default off, AI/browser/token/CSRF boundaries, explicit operator choice, forward-only input, stop/retry, retained provenance, immutable audit, local pre-upload filtering.")
+
+
+if __name__ == "__main__":
+    import argparse
+    from pathlib import Path
+    import tempfile
+    parser = argparse.ArgumentParser(description="Only the detached-recorder command boundary; no DB or native runtime")
+    parser.add_argument("--detach-only", action="store_true", required=True)
+    parser.parse_args()
+    with tempfile.TemporaryDirectory(prefix="tc-detach-check-") as directory:
+        asyncio.run(detach_check(Path(directory)))
+    print("PASS: only the recorder companion is launched; native/receiver identity and owner stay unchanged")
