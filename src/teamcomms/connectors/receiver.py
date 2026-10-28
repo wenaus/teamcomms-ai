@@ -213,6 +213,10 @@ class Receiver:
         await self.flush_outbox()
         await self.reconcile()
 
+    async def offer_sharing_notice(self):
+        from .dialog import offer_native_notice
+        return await offer_native_notice(self.service, self.store, self.adapter, self.session_id)
+
     async def run(self, stop):
         delay = 1
         startup_deadline = time.monotonic() + 30
@@ -221,9 +225,19 @@ class Receiver:
                 try:
                     if not self.registered:
                         await self.register()
-                    if self.service.config.dialog_capture and self.capture_task is None:
-                        self.start_capture()
                     metadata = await self.adapter.metadata()
+                    # A visible session notice precedes baseline AI capture. The
+                    # old both-sides flag cannot consent to this session's human text.
+                    try:
+                        offered = await self.offer_sharing_notice()
+                    except ServiceError as error:
+                        if error.status in {401, 403}:
+                            raise
+                        offered = False
+                        self.store.put("capture_error", f"Sharing policy unavailable: {error}")
+                    if (offered and getattr(self.adapter, "transcript", "") and
+                            (self.capture_task is None or self.capture_task.done())):
+                        self.start_capture()
                     await self.service.post("/sessions/heartbeat", {"session_id": self.session_id,
                         **{k: v for k, v in metadata.items() if k in {"state", "name", "model", "effort"}}})
                     await self.once()

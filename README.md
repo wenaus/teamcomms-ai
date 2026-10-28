@@ -27,8 +27,9 @@ native delivery, and local recovery, with explicit host configuration.
 external provenance, thread preservation, and durable event publication.
 [Notify LLM](docs/notify-llm.md) is the explicit, sparse path for scripts, Capcom
 and selected live-feed posts to request model attention.
-[Dialog](docs/dialog.md) provides attributed transcript capture, bounded history,
-and opt-in session bootstrap. [Pouch](docs/pouch.md) is the team's canonical
+[Dialog](docs/dialog.md) provides attributed transcript capture with a per-session
+AI-sharing notice and separate human choice, bounded history, and opt-in session
+bootstrap. [Pouch](docs/pouch.md) is the team's canonical
 working document, with surgical edits, atomic bulk previews, and saved revision
 links. [Inflight](docs/inflight.md) tracks structured work, persistent owners,
 accepted handoffs, Live/Done state and completion evidence. [Claims](docs/claims.md)

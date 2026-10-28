@@ -71,8 +71,11 @@ the same native session preserves its state. A new native session registers a
 new TC session; it must not impersonate the departed session to inherit delivery.
 Historical Dialog can be requested explicitly with provenance and bounded context.
 
-Enable subscriptions, Dialog capture/bootstrap, Mattermost routes, attention
-controls and execution profiles individually. Their defaults and recovery rules
+Enable subscriptions, Dialog bootstrap, Mattermost routes, attention
+controls and execution profiles individually. Updated receivers offer each
+native session its AI-sharing notice; typed input stays private until its human
+operator makes the separate browser choice. Never use the old capture flag as
+human consent. Component defaults and recovery rules
 are in the respective component guides. Enrollment does not enable recording,
 import history or launch work. The `execution` extra adds pinned wrangle-ai;
 workers require explicit profiles and offers. Preserve the existing coordination

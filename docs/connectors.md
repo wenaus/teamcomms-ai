@@ -195,12 +195,15 @@ bootstrap](dialog.md) are opt-in additions to the Comms instructions.
 ## Dialog and bootstrap
 
 The connector credential needs `dialog:write` for recording, `dialog:read` for
-history, and `entries:read` for configured guidance. Embedded deployments grant
-these through their existing host policy. Add these fields to a selected config:
+sharing state/history, and `entries:read` for configured guidance. Updated
+receivers offer a per-session notice before recording visible AI replies.
+Typed messages stay private until the verified human operator chooses sharing
+on that session's browser page. The old `dialog_capture` flag does not grant
+human consent. Embedded deployments grant component scopes through their
+existing host policy. For optional history bootstrap, use a selected config:
 
 ```json
 {
-  "dialog_capture": true,
   "bootstrap": {
     "host": "example-workstation",
     "hours": 24,
@@ -211,8 +214,8 @@ these through their existing host policy. Add these fields to a selected config:
 }
 ```
 
-The example is a fragment to merge with the URL/token/host configuration. Both
-features default to disabled. Omitting the bootstrap host selects the connector's
+The example is a fragment to merge with the URL/token/host configuration.
+Bootstrap defaults to disabled. Omitting its host selects the connector's
 host; participant, session, topic, and time filters are also supported. History
 and guidance share the rendered character budget. Guidance occupies at most a
 third of the budget when history is present; newest history has priority and
@@ -230,16 +233,26 @@ For a selected existing session, run a recorder alongside its receiver:
 ```sh
 teamcomms-connect --config /path/to/connector.json record \
   --session-id TEAMCOMMS_SESSION_UUID --native-id NATIVE_SESSION_UUID \
-  --client codex --transcript /path/to/native-transcript.jsonl
+  --client codex --transcript /path/to/native-transcript.jsonl \
+  --socket /path/to/owning-codex.sock --pid NATIVE_OWNER_PID --detach
 teamcomms-connect --config /path/to/connector.json reload
 teamcomms-connect --config /path/to/connector.json reload \
   --client codex --native-id NATIVE_SESSION_UUID \
   --socket /path/to/owning-codex.sock --pid NATIVE_OWNER_PID
 ```
 
-`record` starts at the transcript's current end and publishes a coverage marker;
-restarts resume the saved cursor. `--from-start` explicitly includes earlier
-content. `--once` processes up to 100 complete lines and exits; repeat to continue.
+`record` offers the same notice through the selected native channel when given
+its existing socket and PID; neither native runtime nor receiver is restarted.
+Without these options it offers the notice in the invoking terminal. The human
+choice remains in the signed-in browser; no command can opt in on their behalf.
+`--detach` starts only the recorder companion, retains a private log, and leaves
+the existing receiver and native runtime running. It refuses to replace a
+recorder holding the same lock and stops if the selected native owner goes away.
+Its `started` result is process-launch evidence; verify actual events through
+Dialog before claiming coverage. Omit `--detach` for a foreground recorder.
+It starts at the transcript's current end and publishes a coverage marker;
+restarts resume the saved cursor. `--from-start` never backfills human input.
+`--once` processes up to 100 complete lines and exits; repeat to continue.
 The recorder verifies the selected directory identity and uses a separate local
 lock. Automatic capture uses that same lock and saved state. Stop only the
 recorder process with SIGTERM to detach it from an existing session.

@@ -27,6 +27,9 @@ async def recorder_check(root):
             self.fail = True
 
         async def request(self, method, path, body):
+            if method == "GET" and path == "/api/dialog/sharing":
+                return {"assistant_since": "2000-01-01T00:00:00+00:00", "human_choice": "share",
+                        "human_since": "2000-01-01T00:00:00+00:00"}
             key = body["source_id"]
             if key in self.events:
                 assert self.events[key] == body
@@ -42,11 +45,13 @@ async def recorder_check(root):
                         "phase": phase, "content": [{"type": "input_text", "text": text}]}}) + "\n"
 
     path = root / "transcript.jsonl"
-    path.write_text(line("user", "Investigate this event.") + line("assistant", "Checking the state.", "commentary"))
+    path.write_text("")
     service = Service()
     directory = root / "recording"
     store = Store(directory)
     recorder = Recorder(service, store, str(uuid4()), "codex", path, from_start=True)
+    await recorder.once()  # Observe the grant before any human source lines exist.
+    path.write_text(line("user", "Investigate this event.") + line("assistant", "Checking the state.", "commentary"))
     try:
         await recorder.once()
     except ServiceError:
@@ -118,6 +123,10 @@ def exercise(root):
         return register_session(person, RegisterSession(native_id=str(uuid4()), client="codex", host="test", name=name))["session_id"]
     target = session(actor, "target")
     native_sender = session(sender, "sender")
+    from teamcomms.dialog.sharing import choose_human_sharing
+    from teamcomms.dialog.schemas import HumanSharingChoice
+    choose_human_sharing(actor, HumanSharingChoice(session_id=target, operation_id=uuid4(), choice="share"),
+                         human_interactive=True)
     request = RecordDialog(session_id=target, source_id="native:one", source_sequence=1,
         occurred_at=timezone.now(), role="human", content="Operator input", topic="work")
     def save():
@@ -181,6 +190,8 @@ def exercise(root):
             "method": "tools/call", "params": {"name": "get_dialog", "arguments": {"request": {"host": "test"}}}})
         assert result.status_code == 200 and not result.json()["result"].get("isError"), result.text
     asyncio.run(recorder_check(root))
+    from check_dialog_sharing import check as sharing_check
+    sharing_check(root, actor, token, sender, native_sender)
     connection.close()
     print("Dialog checks passed: replay race, ownership/scopes, canonical peer access, immutable evidence, pagination, bootstrap bound, HTTP/MCP, recorder restart/partial-line/truncation.")
 

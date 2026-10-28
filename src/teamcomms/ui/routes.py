@@ -62,6 +62,20 @@ def routes(browser_csrf_url=None):
         html = html.replace('__PREFIX__', escape(prefix, quote=True))
         return HTMLResponse(html, headers=SECURITY_HEADERS)
 
+    async def sharing_page(request):
+        try:
+            from teamcomms.dialog.sharing import get_dialog_sharing
+            from teamcomms.dialog.schemas import SharingQuery
+            await invoke(get_dialog_sharing, SharingQuery(session_id=request.path_params['session_id']))
+        except AccessError as error:
+            return JSONResponse({'error': str(error)}, status_code=error.status)
+        prefix = request.scope.get('root_path', '').rstrip('/')
+        config = escape(json.dumps({'prefix': prefix, 'csrf_url': browser_csrf_url,
+            'session_id': str(request.path_params['session_id'])}), quote=True)
+        html = (ROOT / 'sharing.html').read_text().replace('__CONFIG__', config)
+        html = html.replace('__PREFIX__', escape(prefix, quote=True))
+        return HTMLResponse(html, headers=SECURITY_HEADERS)
+
     async def render(request):
         try:
             actor = current_principal.get()
@@ -97,6 +111,7 @@ def routes(browser_csrf_url=None):
 
     return [Route('/', page), Route('/entries', page), Route('/entries/{entry_id:uuid}', page), Route('/pouch', page),
             Route('/capcom', page), Route('/capcom/{topic_id:uuid}', page), Route('/inflight', page), Route('/inflight/{entry_id:uuid}', page), Route('/sessions', page), Route('/dialog', page),
+            Route('/dialog/sharing/{session_id:uuid}', sharing_page),
             Route('/api/entries/render', render, methods=['POST']),
             Route('/api/entries/compare', compare, methods=['POST']),
             Mount('/assets', StaticFiles(directory=ROOT / 'assets'))]

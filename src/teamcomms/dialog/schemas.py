@@ -52,3 +52,17 @@ class DialogQuery(Request):
 class Bootstrap(DialogQuery):
     hours: int = Field(default=24, ge=1, le=720)
     guidance_entry_ids: list[UUID] = Field(default_factory=list, max_length=10)
+
+
+class SharingQuery(Request):
+    session_id: UUID
+
+
+class SharingNotice(SharingQuery):
+    notice_version: Literal[1] = 1
+    transport: Literal["written", "accepted", "terminal"]
+
+
+class HumanSharingChoice(SharingQuery):
+    operation_id: UUID
+    choice: Literal["share", "private"]

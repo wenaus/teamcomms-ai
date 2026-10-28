@@ -9,13 +9,14 @@ from teamcomms.comms.directory import lock, own_session
 from teamcomms.comms.models import Message
 from teamcomms.entries.models import Entry
 from teamcomms.service.access import AccessError
-from .models import Event
+from .models import Event, Sharing
 
 
 @transaction.atomic
 def record_dialog(actor, request):
     actor.require("dialog:write")
     session = own_session(actor, request.session_id)
+    lock(f"tc-dialog-sharing:{session.id}")
     # One ordering lock ensures a read cursor cannot skip an uncommitted event.
     lock(f"tc-dialog:{actor.team_id}")
     payload = request.model_dump(mode="json")
@@ -24,6 +25,12 @@ def record_dialog(actor, request):
         if existing.request != payload:
             raise AccessError("Source event already has different content", 409)
         return {"event_id": existing.id, "created": False}
+    from .sharing import permits
+    state = Sharing.objects.filter(session=session).first()
+    if not permits(state, request.role, request.occurred_at):
+        # Legacy recorders can advance past excluded human text without storing
+        # it or blocking subsequent allowed AI replies. New recorders filter first.
+        return {"event_id": None, "created": False, "recorded": False}
     participant = session.membership.participant
     attribution = {"recorder_id": str(actor.participant_id), "name": participant.name,
                    "participant_id": str(participant.id), "kind": participant.kind,

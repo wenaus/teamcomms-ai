@@ -8,6 +8,7 @@ import logging
 import os
 from pathlib import Path
 import signal
+import subprocess
 import sys
 from uuid import UUID
 
@@ -26,7 +27,9 @@ CALLS = {
     "acknowledge_message": ("POST", "/messages/acknowledge"), "get_delivery_history": ("GET", "/deliveries/history"),
 }
 DIALOG_CALLS = {"record_dialog": ("POST", "/events"), "get_dialog": ("GET", ""),
-                "session_bootstrap": ("POST", "/bootstrap")}
+                "session_bootstrap": ("POST", "/bootstrap"),
+                "get_dialog_sharing": ("GET", "/sharing"),
+                "record_sharing_notice": ("POST", "/sharing/notice")}
 ENTRY_CALLS = {"create_entry": ("POST", ""), "get_entry": ("GET", "/read"),
     "update_entry": ("POST", "/update"), "restore_entry": ("POST", "/restore"),
     "get_entry_revisions": ("GET", "/revisions"), "search_entries": ("POST", "/search"),
@@ -139,7 +142,7 @@ async def flush(config):
 
 
 async def record_dialog(args, config):
-    from .dialog import Recorder
+    from .dialog import Recorder, offer_terminal_notice, offer_native_notice
     session_id = str(UUID(args.session_id))
     native_id = str(UUID(args.native_id))
     service = ServiceClient(config)
@@ -156,9 +159,44 @@ async def record_dialog(args, config):
         client = "codex" if args.client == "codex_queue" else args.client
         if not match or match["native_id"] != native_id or match["client"] != client:
             raise ValueError("Recording session does not match selected host/client/native identity")
+        who = await service.request("GET", "/api/whoami")
+        if match["participant_id"] != who["participant_id"]:
+            raise ValueError("Recording session must belong to the authenticated participant")
+        if args.detach:
+            if not args.pid or args.once:
+                raise ValueError("Detached recording requires the existing native owner and cannot use --once")
+            # Probe the same recorder lock; never replace an existing recorder.
+            with session_lock(directory):
+                pass
+            command = [sys.executable, "-m", "teamcomms.connectors.cli", "--config",
+                str(Path(args.config).expanduser().resolve()), "record", "--session-id", session_id,
+                "--native-id", native_id, "--client", args.client, "--transcript", args.transcript,
+                "--pid", str(args.pid), "--socket", args.socket]
+            if args.from_start:
+                command.append("--from-start")
+            log_path = directory / "recorder.log"
+            fd = os.open(log_path, os.O_WRONLY | os.O_APPEND | os.O_CREAT | os.O_NOFOLLOW, 0o600)
+            with os.fdopen(fd, "a") as log:
+                process = subprocess.Popen(command, stdin=subprocess.DEVNULL, stdout=log, stderr=log,
+                    start_new_session=True)
+            print(json.dumps({"state": "started", "pid": process.pid, "log": str(log_path),
+                "note": "Recorder started; coverage is confirmed by Dialog records, not process creation"}))
+            return
         with session_lock(directory):
             store = Store(directory)
             try:
+                adapter = None
+                if args.pid:
+                    from .adapters import NativeAdapter
+                    if args.pid <= 1 or (args.client != "codex_queue" and not args.socket):
+                        raise ValueError("A native notice requires the existing owner PID and socket")
+                    adapter = NativeAdapter(args.client, native_id, args.socket, args.pid,
+                        name=match["name"], transcript=args.transcript)
+                    await adapter.metadata()
+                    if not await offer_native_notice(service, store, adapter, session_id):
+                        raise RuntimeError("Sharing notice delivery uncertain; no recorder attached")
+                else:
+                    await offer_terminal_notice(service, session_id)
                 recorder = Recorder(service, store, session_id, args.client, args.transcript,
                                     from_start=args.from_start)
                 if args.once:
@@ -167,7 +205,30 @@ async def record_dialog(args, config):
                     stop = asyncio.Event()
                     for sig in (signal.SIGINT, signal.SIGTERM):
                         asyncio.get_running_loop().add_signal_handler(sig, stop.set)
-                    await recorder.run(stop)
+                    async def watch_owner():
+                        from .receiver import TargetGone
+                        while not stop.is_set():
+                            try:
+                                await adapter.metadata()
+                            except TargetGone:
+                                stop.set()
+                                return
+                            except Exception as error:
+                                store.put("capture_error", "Native owner unavailable: " + type(error).__name__)
+                                stop.set()
+                                return
+                            try:
+                                await asyncio.wait_for(stop.wait(), timeout=10)
+                            except TimeoutError:
+                                pass
+                    watcher = asyncio.create_task(watch_owner()) if adapter else None
+                    try:
+                        await recorder.run(stop)
+                    finally:
+                        stop.set()
+                        if watcher:
+                            watcher.cancel()
+                            await asyncio.gather(watcher, return_exceptions=True)
             finally:
                 store.close()
     finally:
@@ -245,6 +306,9 @@ def main():
     record.add_argument("--native-id", required=True)
     record.add_argument("--client", choices=["claude", "codex", "codex_queue"], required=True)
     record.add_argument("--transcript", required=True)
+    record.add_argument("--socket", default="", help="Existing native socket for the per-session notice")
+    record.add_argument("--pid", type=int, default=0, help="Existing native owner; never restarted")
+    record.add_argument("--detach", action="store_true", help="Start only a recorder companion for this existing native session")
     record.add_argument("--from-start", action="store_true")
     record.add_argument("--once", action="store_true")
     reload = commands.add_parser("reload", help="Retrieve configured history; optionally inject into a selected session")

@@ -132,4 +132,5 @@ class HostAuthentication:
                 raise AccessError("Host authentication identity changed", 401)
             return renewed
 
-        return AuthenticationSession(actor, refresh)
+        return AuthenticationSession(actor, refresh,
+            human_interactive=identity.kind == "human" and identity.session_authenticated)

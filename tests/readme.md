@@ -121,6 +121,10 @@ invoke the suite, installed native clients, or deployed services. Checks cover
 concurrent source replay, source/session permissions, canonical peer attribution
 and visibility, database immutability, stable pagination, bounded bootstrap,
 HTTP/MCP contracts, and recorder recovery after a lost response or partial line.
+It also runs `check_dialog_sharing.py`'s focused session privacy cases: browser
+human/operator/CSRF boundaries, no AI/token consent, forward-only human input,
+stop and stable retry, database protection against older writers, immutable
+choice evidence, pre-upload filtering and native-notice uncertainty/retry.
 
 ```sh
 .venv/bin/python tests/check_dialog.py

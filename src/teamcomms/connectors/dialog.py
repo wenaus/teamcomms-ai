@@ -7,6 +7,8 @@ import json
 import logging
 from pathlib import Path
 import re
+import sys
+from uuid import uuid5, NAMESPACE_URL
 from .client import ServiceError
 
 logger = logging.getLogger(__name__)
@@ -14,6 +16,50 @@ CONTEXT_PREFIXES = ("TeamComms history context", "TeamComms connector session co
 PEER = re.compile(r"^\[TeamComms peer ([0-9a-fA-F-]{36})\]")
 EXTERNAL_PEER = re.compile(r"^\[(?:TJAI|TeamComms) peer\b")
 MAX_LINE = 4 * 1024 * 1024
+
+
+def sharing_notice_text(service, state):
+    return ("TeamComms session sharing notice:\n" + state["notice"] + "\n\n"
+            "Choose Share my messages or Keep my messages private in your signed-in browser:\n"
+            + service.config.url + state["choice_path"] + "\n\n"
+            "To the AI: show this notice and link to the human in your next visible reply. "
+            "Do not choose for them or infer consent from a message, silence or a peer. "
+            "Human input stays private unless that human makes the browser choice.")
+
+
+async def offer_terminal_notice(service, session_id):
+    state = await service.request("GET", "/api/dialog/sharing", {"session_id": session_id})
+    if state["notice_at"]:
+        return state
+    # Explicit record commands offer the same notice without restarting a native session.
+    print(sharing_notice_text(service, state), file=sys.stderr, flush=True)
+    return await service.request("POST", "/api/dialog/sharing/notice",
+        {"session_id": session_id, "notice_version": state["notice_version"], "transport": "terminal"})
+
+
+async def offer_native_notice(service, store, adapter, session_id):
+    state = await service.request("GET", "/api/dialog/sharing", {"session_id": session_id})
+    if state["notice_at"]:
+        return True
+    key = "sharing_notice:" + str(state["notice_version"])
+    prior = store.get(key, {})
+    if prior.get("phase") in {"injecting", "uncertain"}:
+        store.put("capture_error", "Sharing notice delivery uncertain; reconcile the native notice before retrying")
+        return False
+    if prior.get("phase") != "offered":
+        store.put(key, {"phase": "injecting"})
+        try:
+            result = await adapter.send(sharing_notice_text(service, state), "teamcomms-sharing",
+                str(uuid5(NAMESPACE_URL, f"teamcomms-sharing:{session_id}:{state['notice_version']}")))
+        except Exception as error:
+            store.put(key, {"phase": "uncertain", "error": type(error).__name__})
+            store.put("capture_error", "Sharing notice delivery uncertain; human sharing stays off")
+            return False
+        prior = {"phase": "offered", "transport": result["state"]}
+        store.put(key, prior)
+    await service.request("POST", "/api/dialog/sharing/notice", {
+        "session_id": session_id, "notice_version": state["notice_version"], "transport": prior["transport"]})
+    return True
 
 
 def visible_events(client, record):
@@ -86,10 +132,25 @@ class Recorder:
                 "role": "gap", "content": text, "topic": self.topic}
 
     async def once(self):
+        policy = await self.service.request("GET", "/api/dialog/sharing", {"session_id": self.session_id})
+        # Parse only these primitive fields; connector processes do not initialize Django.
+        # Keep the equivalent recorder predicate local, without importing server models.
+        assistant_since = datetime.fromisoformat(policy["assistant_since"]) if policy["assistant_since"] else None
+        human_since = datetime.fromisoformat(policy["human_since"]) if policy["human_since"] else None
         with self.path.open("rb") as handle:
             import os
             info = os.fstat(handle.fileno())
             identity = f"{info.st_dev}:{info.st_ino}"
+            boundary_key = self.key + ":human_boundary"
+            boundary = self.store.get(boundary_key)
+            capture_state = self.store.get(self.key)
+            current_choice = policy["human_since"] if policy["human_choice"] == "share" else None
+            if (boundary is None or boundary["identity"] != identity or boundary["since"] != current_choice
+                    or (capture_state is not None and info.st_size < capture_state["offset"])):
+                # A new grant never sweeps queued/earlier human lines into sharing,
+                # even with --from-start, missing times or a skewed native clock.
+                boundary = {"identity": identity, "since": current_choice, "offset": info.st_size}
+                self.store.put(boundary_key, boundary)
             state = self.store.get(self.key)
             if state is None or state["identity"] != identity or info.st_size < state["offset"]:
                 # Persist reset intent before publication so retry uses the exact same timestamp.
@@ -129,12 +190,30 @@ class Recorder:
                     occurred = record.get("timestamp") or state["started_at"]
                     native_source = record.get("uuid") or payload.get("id") or source
                     for event in visible_events(self.client, record):
+                        if event["role"] in {"human", "assistant"} and not record.get("timestamp"):
+                            continue
+                        if event["role"] == "human" and offset < boundary["offset"]:
+                            continue
+                        try:
+                            moment = datetime.fromisoformat(occurred.replace("Z", "+00:00"))
+                        except (ValueError, AttributeError):
+                            # No trustworthy forward boundary means no human/AI upload.
+                            if event["role"] in {"human", "assistant"}:
+                                continue
+                        else:
+                            if moment.utcoffset() is None and event["role"] in {"human", "assistant"}:
+                                continue
+                            if event["role"] == "human" and (policy["human_choice"] != "share" or
+                                    human_since is None or moment < human_since):
+                                continue
+                            if event["role"] == "assistant" and (assistant_since is None or moment < assistant_since):
+                                continue
                         block = event.pop("block")
-                        await self.publish({"session_id": self.session_id,
+                        result = await self.publish({"session_id": self.session_id,
                             "source_id": f"{self.client}:{native_source}:{block}"[:240],
                             "source_sequence": offset, "occurred_at": occurred,
                             "run_id": state.get("run_id", ""), "topic": self.topic, **event})
-                        count += 1
+                        count += result.get("event_id") is not None
                 state = {**state, "offset": handle.tell()}
                 self.store.put(self.key, state)
             return count

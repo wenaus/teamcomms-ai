@@ -23,7 +23,8 @@ class Configuration(BaseModel):
     greeting: bool = True
     work: str = Field(default="", max_length=1000)
     attention_controls: bool = False
-    dialog_capture: bool = False
+    dialog_capture: bool = Field(default=False,
+        description="Legacy capture flag; per-session human sharing always requires the human browser choice")
     bootstrap: Bootstrap | None = None
 
     @model_validator(mode="after")

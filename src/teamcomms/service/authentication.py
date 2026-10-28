@@ -14,6 +14,7 @@ from .models import Credential
 class AuthenticationSession:
     actor: Principal
     refresh: Callable[[], Awaitable[Principal]]
+    human_interactive: bool = False
 
 
 def refresh_credential(actor):
