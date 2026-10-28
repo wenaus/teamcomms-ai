@@ -90,6 +90,42 @@ async def recorder_privacy(root):
     store.close()
 
 
+async def detach_check(root):
+    from types import SimpleNamespace
+    from unittest.mock import patch
+    from teamcomms.connectors import cli
+    session, native, participant = map(str, (uuid4(), uuid4(), uuid4()))
+    config = SimpleNamespace(host="synthetic", state_dir=root / "detached")
+    args = SimpleNamespace(session_id=session, native_id=native, client="codex",
+        transcript=str(root / "selected.jsonl"), config=str(root / "synthetic-connector.json"),
+        pid=424242, socket="selected-owning.sock", detach=True, once=False, from_start=False)
+    class Service:
+        async def get(self, path, **query):
+            return {"sessions": [{"session_id": session, "native_id": native, "client": "codex",
+                                  "participant_id": participant}], "next_offset": None}
+
+        async def request(self, method, path):
+            assert method == "GET" and path == "/api/whoami"
+            return {"participant_id": participant}
+
+        async def close(self):
+            pass
+
+    launched = []
+    def spawn(command, **options):
+        import sys
+        assert command[:3] == [sys.executable, "-m", "teamcomms.connectors.cli"]
+        assert "record" in command and "receive" not in command and "--detach" not in command
+        assert command[command.index("--pid")+1] == str(args.pid)
+        assert command[command.index("--native-id")+1] == native
+        assert options["start_new_session"] is True
+        launched.append(command)
+        return SimpleNamespace(pid=123456)
+    with patch.object(cli, "ServiceClient", return_value=Service()), patch.object(cli.subprocess, "Popen", side_effect=spawn):
+        await cli.record_dialog(args, config)
+    assert len(launched) == 1
+
+
 def check(root, operator, operator_token, ai, ai_session):
     from django.db import IntegrityError, transaction
     from django.utils import timezone as django_timezone
@@ -195,4 +231,5 @@ def check(root, operator, operator_token, ai, ai_session):
     else:
         raise AssertionError("Human sharing evidence must be immutable")
     asyncio.run(recorder_privacy(root))
+    asyncio.run(detach_check(root))
     print("Sharing privacy checks passed: default off, AI/browser/token/CSRF boundaries, explicit operator choice, forward-only input, stop/retry, retained provenance, immutable audit, local pre-upload filtering.")

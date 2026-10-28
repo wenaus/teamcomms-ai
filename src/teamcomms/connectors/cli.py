@@ -163,7 +163,7 @@ async def record_dialog(args, config):
         if match["participant_id"] != who["participant_id"]:
             raise ValueError("Recording session must belong to the authenticated participant")
         if args.detach:
-            if not args.pid or args.once:
+            if args.pid <= 1 or args.once or (args.client != "codex_queue" and not args.socket):
                 raise ValueError("Detached recording requires the existing native owner and cannot use --once")
             # Probe the same recorder lock; never replace an existing recorder.
             with session_lock(directory):
