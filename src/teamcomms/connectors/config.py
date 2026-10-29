@@ -25,6 +25,8 @@ class Configuration(BaseModel):
     attention_controls: bool = False
     dialog_capture: bool = Field(default=False,
         description="Legacy capture flag; per-session human sharing always requires the human browser choice")
+    dialog_recording: bool = Field(default=True,
+        description="False: this connector's sessions record nothing in team Dialog and offer no sharing notice")
     bootstrap: Bootstrap | None = None
 
     @model_validator(mode="after")

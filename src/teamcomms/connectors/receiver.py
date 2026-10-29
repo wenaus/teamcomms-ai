@@ -228,13 +228,15 @@ class Receiver:
                     metadata = await self.adapter.metadata()
                     # A visible session notice precedes baseline AI capture. The
                     # old both-sides flag cannot consent to this session's human text.
-                    try:
-                        offered = await self.offer_sharing_notice()
-                    except ServiceError as error:
-                        if error.status in {401, 403}:
-                            raise
-                        offered = False
-                        self.store.put("capture_error", f"Sharing policy unavailable: {error}")
+                    # A connector with dialog_recording off records nothing and offers no notice.
+                    offered = False
+                    if getattr(self.service.config, "dialog_recording", True):
+                        try:
+                            offered = await self.offer_sharing_notice()
+                        except ServiceError as error:
+                            if error.status in {401, 403}:
+                                raise
+                            self.store.put("capture_error", f"Sharing policy unavailable: {error}")
                     if (offered and getattr(self.adapter, "transcript", "") and
                             (self.capture_task is None or self.capture_task.done())):
                         self.start_capture()

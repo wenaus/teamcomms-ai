@@ -95,7 +95,8 @@ does not establish complete transcript coverage.
 ## Connector operation
 
 Updated receivers attach visible-AI capture after offering the per-session
-notice. The legacy `dialog_capture` flag grants no human sharing permission;
+notice. A connector configured with `dialog_recording: false` offers no notice
+and records nothing from its sessions. The legacy `dialog_capture` flag grants no human sharing permission;
 it must not be enabled globally as a substitute for the browser choice. Set
 `bootstrap` to an explicit filter/budget object to load recent context; bootstrap
 defaults to disabled. Claude SessionStart supplies its transcript path; Codex

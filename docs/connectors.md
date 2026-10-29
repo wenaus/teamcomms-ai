@@ -199,8 +199,11 @@ sharing state/history, and `entries:read` for configured guidance. Updated
 receivers offer a per-session notice before recording visible AI replies.
 Typed messages stay private until the verified human operator chooses sharing
 on that session's browser page. The old `dialog_capture` flag does not grant
-human consent. Embedded deployments grant component scopes through their
-existing host policy. For optional history bootstrap, use a selected config:
+human consent. Set `dialog_recording: false` for a connector whose sessions
+must not appear in team Dialog: its receivers offer no notice and record
+neither side, and its `record` command refuses. Embedded deployments grant
+component scopes through their existing host policy. For optional history
+bootstrap, use a selected config:
 
 ```json
 {

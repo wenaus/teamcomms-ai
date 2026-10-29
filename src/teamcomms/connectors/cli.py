@@ -143,6 +143,8 @@ async def flush(config):
 
 async def record_dialog(args, config):
     from .dialog import Recorder, offer_terminal_notice, offer_native_notice
+    if not config.dialog_recording:
+        raise ValueError("This connector's configuration turns dialog recording off")
     session_id = str(UUID(args.session_id))
     native_id = str(UUID(args.native_id))
     service = ServiceClient(config)
