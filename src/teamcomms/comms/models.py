@@ -3,6 +3,7 @@
 import uuid
 from django.db import models
 from django.db.models import Q
+from django.utils import timezone
 
 
 class Resource(models.Model):
@@ -43,6 +44,9 @@ class Session(models.Model):
     delivery_mode = models.CharField(max_length=40, default="pull")
     state = models.CharField(max_length=16, default="unknown")
     last_seen = models.DateTimeField()
+    # Last sign of use: registration, a running turn, a reported transcript turn, a send or an
+    # acknowledgment. Interactive AI sessions idle past directory.DORMANT_AFTER are dormant.
+    last_active_at = models.DateTimeField(default=timezone.now)
     resources = models.ManyToManyField(Resource)
     # Incremented under the session row lock; cursor order follows commit order.
     last_sequence = models.PositiveBigIntegerField(default=0)

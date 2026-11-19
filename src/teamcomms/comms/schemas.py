@@ -4,7 +4,7 @@ from datetime import datetime
 import json
 from typing import Annotated, Literal
 from uuid import UUID
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, model_validator
 
 Label = Annotated[str, Field(min_length=1, max_length=160, pattern=r"\S")]
 State = Literal["idle", "active", "unknown", "offline"]
@@ -42,6 +42,8 @@ class Heartbeat(Request):
     name: Label | None = None
     model: str | None = Field(default=None, max_length=120)
     effort: str | None = Field(default=None, max_length=40)
+    # The native transcript's latest write, so a turn between heartbeats still counts as use.
+    last_turn_at: AwareDatetime | None = None
 
 
 class Page(Request):

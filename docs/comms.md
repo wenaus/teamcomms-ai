@@ -35,8 +35,23 @@ The directory records name, host, client, native ID, workspace, model, effort,
 capabilities, delivery mode, activity, and resource IDs. Registration supplies the
 complete metadata and resource set. Heartbeats change activity and optionally
 name, model, and effort. States are `idle`, `active`, `unknown`, and `offline`.
-Online discovery requires active membership, a non-offline state, and a heartbeat
-within 90 seconds. Availability and delivery mode are distinct fields.
+Online discovery requires active membership, a non-offline state, a heartbeat
+within 90 seconds, and a session that is not dormant. Availability and delivery
+mode are distinct fields.
+
+A heartbeat proves only that a receiver runs, which it does as long as its native
+client is open. Each session therefore records `last_active_at`, its last sign of
+use: registration, a heartbeat reporting `active` (a running turn), a heartbeat's
+`last_turn_at` (the native transcript's latest write), a message sent from the
+session, or an acknowledgment by it. A `claude` or `codex` session unused for two
+hours is **dormant** (`comms/directory.py`, `DORMANT_AFTER`): it leaves discovery
+and selector routing, including `@all`, and its stream is refused with 409 so it
+holds no connection. Its inbox still receives direct mail, which its receiver
+collects on each poll, and its next turn wakes it. Bridges, programs and workers
+report no turns and never go dormant, nor does a session registered with the
+`stay-awake` capability. Directory records carry `last_active_at` and `dormant`.
+Sessions that existed before migration `0004_session_last_active_at` start from
+the migration time.
 Each session record also carries its participant's name and kind and, for an
 AI participant, its operator's ID and name, so one directory query shows who
 is online and whose sessions they are.
@@ -141,7 +156,8 @@ The standalone loopback development server uses HTTP as described in
 [service setup](service.md).
 
 Streams use Server-Sent Events (SSE), last at most 25 seconds, and reconnect using
-`Last-Event-ID` or the `after` parameter. Delivery sequence numbers are local to a
+`Last-Event-ID` or the `after` parameter. A dormant session's stream request is
+refused with 409 before a listener opens. Delivery sequence numbers are local to a
 session. Transactions lock destination sessions in UUID order before allocating
 sequences, so a cursor cannot skip an earlier uncommitted publication.
 
@@ -228,7 +244,7 @@ object with the same fields as HTTP JSON bodies or GET parameters.
 |---|---|---|
 | `POST /sessions` | `register_session` | Native ID, client, host, name; optional metadata/resources |
 | `GET /sessions` | `list_sessions` | Host, participant, resource, include-offline, pagination |
-| `POST /sessions/heartbeat` | `heartbeat_session` | Session ID, state; optional name/model/effort |
+| `POST /sessions/heartbeat` | `heartbeat_session` | Session ID, state; optional name/model/effort/last_turn_at |
 | `POST /resources` | `register_resource` | Key, kind, name; host/project/aliases for checkouts |
 | `GET /resources` | `list_resources` | Pagination |
 | `POST /groups` | `register_group` | Key, name |

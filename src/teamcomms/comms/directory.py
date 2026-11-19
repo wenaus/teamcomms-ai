@@ -2,12 +2,20 @@
 
 from datetime import timedelta
 from django.db import connection, transaction
+from django.db.models import Q
 from django.utils import timezone
 
 from teamcomms.service.access import AccessError
 from .models import Group, Resource, Session, Subscription
 
 FRESH_SECONDS = 90
+# An interactive AI session with no use for this long is dormant: out of discovery and selector
+# routing, its stream refused. Its next turn wakes it; direct mail waits in its inbox.
+DORMANT_AFTER = timedelta(hours=2)
+# Only these clients report turns. Bridges, programs and workers never go dormant.
+DORMANT_CLIENTS = ("claude", "codex")
+# A session registered with this capability (connector `stay_awake`) never goes dormant.
+STAY_AWAKE = "stay-awake"
 
 
 def lock(key):
@@ -26,21 +34,50 @@ def own_session(actor, session_id):
     return row
 
 
+# The dormancy rule, as a query and for a loaded row; both read the constants above.
+def dormant(now):
+    return (Q(client__in=DORMANT_CLIENTS, last_active_at__lt=now - DORMANT_AFTER)
+            & ~Q(state="active") & ~Q(capabilities__contains=[STAY_AWAKE]))
+
+
+def is_dormant(row, now):
+    return (row.client in DORMANT_CLIENTS and row.last_active_at < now - DORMANT_AFTER
+            and row.state != "active" and STAY_AWAKE not in row.capabilities)
+
+
 def online(rows):
-    return rows.filter(membership__active=True, last_seen__gte=timezone.now() - timedelta(seconds=FRESH_SECONDS)).exclude(state="offline")
+    now = timezone.now()
+    return rows.filter(membership__active=True, last_seen__gte=now - timedelta(seconds=FRESH_SECONDS)).exclude(state="offline").exclude(dormant(now))
 
 
 def session_record(row):
     person = row.membership.participant
     operator = person.operator
+    now = timezone.now()
+    asleep = is_dormant(row, now)
     return {"session_id": str(row.id), "participant_id": str(row.membership.participant_id),
         "participant_name": person.name, "participant_kind": person.kind,
         "operator_id": str(operator.id) if operator else None,
         "operator_name": operator.name if operator else None,
         **{k: getattr(row, k) for k in ("native_id", "client", "host", "name", "workspace", "model", "effort", "capabilities", "delivery_mode", "state")},
         "last_seen": row.last_seen.isoformat(),
-        "online": row.membership.active and row.state != "offline" and row.last_seen >= timezone.now() - timedelta(seconds=FRESH_SECONDS),
+        "last_active_at": row.last_active_at.isoformat(),
+        "dormant": asleep,
+        "online": row.membership.active and row.state != "offline" and not asleep and row.last_seen >= now - timedelta(seconds=FRESH_SECONDS),
         "resource_ids": [str(r.id) for r in row.resources.all()]}
+
+
+def touch(row):
+    """Record a sign of use (a send or an acknowledgment from the session)."""
+    Session.objects.filter(pk=row.id).update(last_active_at=timezone.now())
+
+
+def require_awake(actor, session_id):
+    row = own_session(actor, session_id)
+    if is_dormant(row, timezone.now()):
+        raise AccessError("Session is dormant: no turn for over "
+                          f"{int(DORMANT_AFTER.total_seconds() // 3600)} hours. Its next turn wakes it; "
+                          "direct messages wait in its inbox", 409)
 
 
 @transaction.atomic
@@ -53,8 +90,9 @@ def register_session(actor, request):
     identity = {k: values.pop(k) for k in ("native_id", "client", "host")}
     # Prevent concurrent re-registration from losing the sequence counter or identity.
     lock(f"tc-session:{actor.membership_id}:{identity}")
+    now = timezone.now()
     row, _ = Session.objects.update_or_create(membership_id=actor.membership_id, **identity,
-        defaults={**values, "last_seen": timezone.now()})
+        defaults={**values, "last_seen": now, "last_active_at": now})
     row.resources.set(resources)
     return session_record(row)
 
@@ -62,8 +100,14 @@ def register_session(actor, request):
 def heartbeat_session(actor, request):
     actor.require("sessions:write")
     row = own_session(actor, request.session_id)
-    changes = request.model_dump(exclude_none=True, exclude={"session_id"})
-    Session.objects.filter(pk=row.id).update(**changes, last_seen=timezone.now())
+    changes = request.model_dump(exclude_none=True, exclude={"session_id", "last_turn_at"})
+    now = timezone.now()
+    used = [row.last_active_at]
+    if request.state == "active":
+        used.append(now)
+    if request.last_turn_at:
+        used.append(min(request.last_turn_at, now))
+    Session.objects.filter(pk=row.id).update(**changes, last_seen=now, last_active_at=max(used))
     row.refresh_from_db()
     return session_record(row)
 

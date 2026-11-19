@@ -192,6 +192,23 @@ The receiving AI acknowledges after considering a message, with no acknowledgmen
 reply or routine user-facing narration. [Dialog capture and recent-history
 bootstrap](dialog.md) are opt-in additions to the Comms instructions.
 
+## Dormancy
+
+A session unused for two hours is dormant ([Comms](comms.md#identity-and-directory)).
+Receivers report use on each heartbeat: the native turn state and, when the
+service records use, `last_turn_at` from the transcript's modification time, so a
+turn between heartbeats still counts. While the service reports the session
+dormant, the receiver opens no stream; every 60 seconds it heartbeats and checks
+its inbox, so direct mail is still delivered and the session's next turn wakes it.
+A receiver predating dormancy gets a 409 on its stream request and retries with
+its usual backoff, at most every 25 seconds, also collecting its inbox each time;
+a new receiver sends `last_turn_at` only to a service that returned
+`last_active_at` at registration.
+
+Set `stay_awake: true` in a connector configuration whose sessions are left idle
+on purpose, to be woken by messages (alarm watchers, for example). Its receivers
+register the `stay-awake` capability and never go dormant.
+
 ## Dialog and bootstrap
 
 The connector credential needs `dialog:write` for recording, `dialog:read` for

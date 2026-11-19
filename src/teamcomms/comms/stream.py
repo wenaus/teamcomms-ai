@@ -12,7 +12,7 @@ from starlette.responses import JSONResponse, StreamingResponse
 
 from teamcomms.service.access import AccessError, current_principal, current_authentication
 from teamcomms.service.dispatch import database_call
-from . import operations
+from . import directory, operations
 from .schemas import Stream
 
 logger = logging.getLogger(__name__)
@@ -50,6 +50,8 @@ async def stream_messages(request):
         query = Stream.model_validate(values)
         # Validate scope/session/cursor before opening a dedicated listener.
         await read_page(authentication, query)
+        # A dormant session gets no stream (409): its receiver backs off instead of holding one.
+        await database_call(directory.require_awake, actor, query.session_id)
         listener = await psycopg.AsyncConnection.connect(**listener_params(), autocommit=True)
         await listener.execute(sql.SQL("LISTEN {}").format(sql.Identifier(operations.channel(query.session_id))))
         # LISTEN is committed before the authoritative read: closes the subscribe/read race.

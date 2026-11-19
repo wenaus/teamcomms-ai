@@ -7,7 +7,7 @@ from django.utils import timezone
 from teamcomms.entries.models import Entry, Revision
 from teamcomms.service.access import AccessError
 from teamcomms.service.models import Participant
-from .directory import lock, online, own_session, sessions
+from .directory import lock, online, own_session, sessions, touch
 from .models import Delivery, Group, Message, MessageReference, Receipt, Resource, Session, Subscription
 
 
@@ -88,6 +88,8 @@ def send_message(actor, request):
             raise AccessError("Message ID already has a different envelope or author", 409)
         return publication_record(existing)
     sender = own_session(actor, request.sender_session_id) if request.sender_session_id else None
+    if sender:
+        touch(sender)
     if request.reply_to and (not sender or not Delivery.objects.filter(message_id=request.reply_to, session=sender).exists()):
         raise AccessError("Reply must reference a message delivered to the sending session", 400)
     references = []
@@ -232,5 +234,5 @@ def _acknowledge(session_id, message_id):
 @transaction.atomic
 def acknowledge_message(actor, request):
     actor.require("comms:write")
-    own_session(actor, request.session_id)
+    touch(own_session(actor, request.session_id))
     return _acknowledge(request.session_id, request.message_id)

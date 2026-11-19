@@ -14,6 +14,11 @@ from .presentation import message_text, session_instructions
 from .registration import notice
 
 logger = logging.getLogger(__name__)
+# A dormant session (comms directory: no use for DORMANT_AFTER) holds no stream; its receiver
+# heartbeats and checks its inbox at this interval until a turn wakes it.
+DORMANT_POLL_SECONDS = 60
+# The capability the service exempts from dormancy (comms directory STAY_AWAKE).
+STAY_AWAKE = "stay-awake"
 
 
 class TargetGone(RuntimeError):
@@ -31,14 +36,23 @@ class Receiver:
         self.config_path = config_path
         self.session_id = None
         self.registered = False
+        self.reports_activity = False
         self.capture_task = None
         self.capture_stop = asyncio.Event()
 
     async def register(self):
         metadata = await self.adapter.metadata()
+        metadata.pop("last_turn_at", None)  # Heartbeat-only; registration rejects it.
+        extra = set()
         if getattr(self.service.config, 'attention_controls', False):
-            metadata['capabilities'] = sorted(set(metadata.get('capabilities', self.registration.get('capabilities', []))) | {'attention-v1'})
+            extra.add('attention-v1')
+        if getattr(self.service.config, 'stay_awake', False):
+            extra.add(STAY_AWAKE)
+        if extra:
+            metadata['capabilities'] = sorted(set(metadata.get('capabilities', self.registration.get('capabilities', []))) | extra)
         result = await self.service.post("/sessions", {**self.registration, **metadata})
+        # A server that records use returns it; only then may heartbeats carry last_turn_at.
+        self.reports_activity = "last_active_at" in result
         prior = self.store.get("session_id")
         if prior and prior != result["session_id"]:
             raise RuntimeError("Local state belongs to a different service session; use a new state directory")
@@ -240,18 +254,33 @@ class Receiver:
                     if (offered and getattr(self.adapter, "transcript", "") and
                             (self.capture_task is None or self.capture_task.done())):
                         self.start_capture()
-                    await self.service.post("/sessions/heartbeat", {"session_id": self.session_id,
-                        **{k: v for k, v in metadata.items() if k in {"state", "name", "model", "effort"}}})
+                    fields = {"state", "name", "model", "effort"} | ({"last_turn_at"} if self.reports_activity else set())
+                    beat = {k: v for k, v in metadata.items() if k in fields}
+                    if beat.get("last_turn_at") is None:
+                        beat.pop("last_turn_at", None)
+                    beat = await self.service.post("/sessions/heartbeat", {"session_id": self.session_id, **beat})
                     await self.once()
-                    async with aclosing(self.service.stream(self.session_id, self.store.get("cursor", 0))) as stream:
-                        async for incoming in stream:
-                            if stop.is_set():
-                                break
-                            if incoming["event"] == "message":
-                                self.store.ingest(incoming["data"])
-                                await self.dispatch_pending()
-                            elif incoming["event"] == "refresh":
-                                await self.reconcile()
+                    if beat.get("dormant"):
+                        # No stream while dormant; once() still delivers direct mail each poll,
+                        # and the session's next turn, reported by the heartbeat, wakes it.
+                        delay = 1
+                        await self.pause(stop, DORMANT_POLL_SECONDS)
+                        continue
+                    try:
+                        async with aclosing(self.service.stream(self.session_id, self.store.get("cursor", 0))) as stream:
+                            async for incoming in stream:
+                                if stop.is_set():
+                                    break
+                                if incoming["event"] == "message":
+                                    self.store.ingest(incoming["data"])
+                                    await self.dispatch_pending()
+                                elif incoming["event"] == "refresh":
+                                    await self.reconcile()
+                    except ServiceError as error:
+                        if error.status != 409:
+                            raise
+                        # Refused as dormant after the heartbeat: wait as a dormant session does.
+                        await self.pause(stop, DORMANT_POLL_SECONDS)
                     delay = 1
                 except TargetNotReady:
                     if self.registered or time.monotonic() >= startup_deadline:

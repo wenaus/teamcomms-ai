@@ -23,6 +23,8 @@ class Configuration(BaseModel):
     greeting: bool = True
     work: str = Field(default="", max_length=1000)
     attention_controls: bool = False
+    stay_awake: bool = Field(default=False,
+        description="True: this connector's sessions never go dormant, for sessions left idle to be woken by messages")
     dialog_capture: bool = Field(default=False,
         description="Legacy capture flag; per-session human sharing always requires the human browser choice")
     dialog_recording: bool = Field(default=True,

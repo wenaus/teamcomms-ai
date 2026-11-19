@@ -1,6 +1,7 @@
 """Version-specific native transports behind a common receiver interface."""
 
 import asyncio
+from datetime import datetime, timezone
 import json
 import os
 from pathlib import Path
@@ -31,6 +32,16 @@ def transcript_model(path):
     return ""
 
 
+def transcript_time(path):
+    """The transcript's latest write as an aware ISO time: every turn appends to it."""
+    if not path:
+        return None
+    try:
+        return datetime.fromtimestamp(Path(path).stat().st_mtime, timezone.utc).isoformat()
+    except OSError:
+        return None  # A new session may not have written its first transcript item.
+
+
 class NativeAdapter:
     def __init__(self, client, native_id, socket_path, owner_pid, *, name, model="", transcript="", registry=None):
         self.client, self.native_id, self.socket = client, native_id, socket_path
@@ -54,7 +65,8 @@ class NativeAdapter:
                 if thread.get("threadSource") == "system":
                     raise TargetGone("Internal threads cannot register as interactive sessions")
                 return {"name": thread.get("name") or self.name, "model": thread.get("model") or self.model,
-                        "state": "active" if thread["status"]["type"] == "active" else "idle"}
+                        "state": "active" if thread["status"]["type"] == "active" else "idle",
+                        "last_turn_at": transcript_time(self.transcript)}
         for path in self.registry.glob("*.json"):
             try:
                 record = json.loads(path.read_text())
@@ -65,7 +77,8 @@ class NativeAdapter:
                     raise TargetGone("Claude registry owner differs from the selected process")
                 self.model = transcript_model(self.transcript) or self.model
                 return {"name": record.get("name") or self.name, "model": self.model,
-                        "state": "active" if record.get("status") in {"busy", "active", "working"} else "idle"}
+                        "state": "active" if record.get("status") in {"busy", "active", "working"} else "idle",
+                        "last_turn_at": transcript_time(self.transcript)}
         raise TargetNotReady("Claude session is absent from the live registry")
 
     async def setup(self, text):
